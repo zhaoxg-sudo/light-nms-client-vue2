@@ -13,7 +13,7 @@
         </select>
       </div>
 
-      <div class="top-title">LED直流智能照明及能源管理平台</div>
+      <div class="top-title">LED智能照明及能源管理平台</div>
 
       <div class="top-right">
         <button class="btn">注销</button>
