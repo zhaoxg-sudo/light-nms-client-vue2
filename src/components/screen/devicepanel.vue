@@ -148,7 +148,7 @@ export default {
         return
       }
       try {
-        await fetch('http://123.57.87.144:7001/api/tcp/send', {
+        await fetch(this.$appHost + '/api/tcp/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clientKey: this.remoteId, content })

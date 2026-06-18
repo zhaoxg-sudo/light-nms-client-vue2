@@ -33,12 +33,16 @@ import './assets/js/common.js'
 // import './assets/js/jquery.slimscroll.min'
 // 2.动态高度
 // import './assets/js/effect.js'
+// 导入全局地址
+import { APP_HOST } from './hosts'
+// 挂载全局，所有页面直接 this.$apiHost 使用
+Vue.prototype.$appHost = APP_HOST
 Vue.use(dataV)
 Vue.use(ElementUI)
 // web socket
 Vue.use(new VueSocketio({
   debug: false,
-  connection: 'http://123.57.87.144:7001'
+  connection: APP_HOST
 }))
 Vue.prototype.$ajax = axios
 Vue.component('downloadExcel', JsonExcel)

@@ -74,7 +74,7 @@ export default {
       'setInitData'
     ]),
     refresh () {
-      this.$ajax.get('http://power.ieyeplus.com:7001/' + 'localall')
+      this.$ajax.get(this.$appHost + '/localall')
         .then((res) => {
           console.log('从数据库读取的catalog数据=', res.data)
           // let data = res.data

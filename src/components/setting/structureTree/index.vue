@@ -61,7 +61,7 @@ export default {
         label: 'label'
       },
       instance: this.$ajax.create({
-        baseURL: 'http://power.ieyeplus.com:7001/'
+        baseURL: this.$appHost
       })
     }
   },
@@ -85,7 +85,7 @@ export default {
       'setInitData'
     ]),
     refresh () {
-      this.$ajax.get('http://power.ieyeplus.com:7001/' + 'localall')
+      this.$ajax.get(this.$appHost + 'localall')
         .then((res) => {
           this.treeData = this.actionGetCatalog(res.data)
           let data = this.treeData
