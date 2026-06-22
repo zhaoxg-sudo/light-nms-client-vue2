@@ -85,7 +85,7 @@ export default {
       'setInitData'
     ]),
     refresh () {
-      this.$ajax.get(this.$appHost + 'localall')
+      this.$ajax.get(this.$appHost + '/localall')
         .then((res) => {
           this.treeData = this.actionGetCatalog(res.data)
           let data = this.treeData

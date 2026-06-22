@@ -1,5 +1,5 @@
 <template>
-  <div class="screen-page" :class="{ 'screen-full': isFullScreen }">
+  <div class="screen-page">
     <!-- 顶部导航 -->
     <div class="top-bar">
       <div class="top-left">
@@ -17,7 +17,7 @@
 
       <div class="top-right">
         <button class="btn">注销</button>
-        <button class="btn" @click="toggleFullScreen">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
+        <button class="btn">缩放</button>
         <button class="btn">个人后台</button>
         <div class="time">{{ nowTime }}</div>
       </div>
@@ -29,9 +29,9 @@
       <div class="left-box">
         <dv-border-box-1 class="panel">
           <div class="panel-title"> 项目统计 </div>
-          <div class="stat-grid">
+            <div class="stat-grid">
             <!-- 第一行 -->
-            <div class="stat-card">
+              <div class="stat-card">
               <div class="num">0.23</div>
               <div class="unit">(kW)</div>
               <div class="label">总功率</div>
@@ -41,18 +41,18 @@
               <div class="unit">(kWh)</div>
               <div class="label">总累计消耗</div>
             </div>
-            <!-- 第二行 -->
-            <div class="stat-card">
-              <div class="num">90.68</div>
-              <div class="unit">(kWh)</div>
-              <div class="label">今年累计消耗</div>
-            </div>
-            <div class="stat-card">
-              <div class="num">100</div>
-              <div class="unit"></div>
-              <div class="label">部署站点</div>
-            </div>
+           <!-- 第二行 -->
+           <div class="stat-card">
+             <div class="num">90.68</div>
+             <div class="unit">(kWh)</div>
+             <div class="label">今年累计消耗</div>
+           </div>
+           <div class="stat-card">
+             <div class="num">100</div>
+             <div class="unit"></div>
+             <div class="label">部署站点</div>
           </div>
+        </div>
         </dv-border-box-1>
 
         <dv-border-box-1 class="panel m-top">
@@ -69,6 +69,7 @@
       <!-- 中间地图 → 已替换为高德 -->
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
+          <!-- <div class="panel-title"> 设备分布 </div> -->
           <div id="container" class="map-box"></div>
         </dv-border-box-1>
       </div>
@@ -91,6 +92,7 @@
               </tr>
             </thead>
             <tbody>
+              <!-- ✅ 双击这一行弹出控制面板 -->
               <tr @dblclick="openDevicePanel">
                 <td>1</td>
                 <td>样机</td>
@@ -104,6 +106,7 @@
       </div>
     </div>
 
+    <!-- ✅ 设备控制面板弹窗（嵌入在这里） -->
     <DeviceControlPanel
       :visible.sync="showDevicePanel"
       :remoteId="remoteId"
@@ -134,8 +137,7 @@ export default {
       deviceOnline: false,
       remoteId: '',
       lastGps: null,
-      showDevicePanel: false,
-      isFullScreen: false
+      showDevicePanel: false // ✅ 弹窗控制
     }
   },
 
@@ -156,7 +158,7 @@ export default {
         console.log('🔥 实时收到GPS ===>', data)
         window.latestGpsData = data
         this.remoteId = data.clientKey
-        this.deviceOnline = true
+        this.deviceOnline = true // ✅ 自动同步在线状态
 
         if (window.currentMapInstance && window.currentMapMarker) {
           const point = new window.AMap.LngLat(data.lng, data.lat)
@@ -175,20 +177,14 @@ export default {
     this.initLineChart()
     this.initMap()
 
-    // resize监听 仅重算布局，不刷新地图
+    // 窗口尺寸监听：仅执行高度计算，不刷新地图、不派发resize事件
     window.__screenResizeHandler = () => {
       this.$nextTick(() => {
+        // 只执行侧边栏宽度高度计算，不碰地图图表
         this.getHeightsWidths()
       })
     }
     window.addEventListener('resize', window.__screenResizeHandler)
-
-    // 监听ESC退出全屏同步状态
-    document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement) {
-        this.isFullScreen = false
-      }
-    })
 
     if (window.latestGpsData) {
       const data = window.latestGpsData
@@ -206,13 +202,6 @@ export default {
 
   beforeDestroy () {
     clearInterval(this.timer)
-    // 移除resize监听
-    window.removeEventListener('resize', window.__screenResizeHandler)
-    delete window.__screenResizeHandler
-    // 退出全屏
-    if (document.fullscreenElement) {
-      document.exitFullscreen()
-    }
     if (this.map) {
       this.map.destroy()
     }
@@ -222,6 +211,7 @@ export default {
 
   sockets: {},
   methods: {
+    // ✅ 打开设备面板
     openDevicePanel () {
       if (!this.remoteId) {
         alert('未获取到远端ID')
@@ -229,23 +219,6 @@ export default {
       }
       this.showDevicePanel = true
     },
-
-    // 切换全屏/恢复缩放
-    async toggleFullScreen () {
-      const targetDom = document.querySelector('.screen-page')
-      if (!this.isFullScreen) {
-        // 进入全屏
-        await targetDom.requestFullscreen().catch(err => {
-          console.warn('全屏开启失败', err)
-        })
-        this.isFullScreen = true
-      } else {
-        // 退出全屏
-        await document.exitFullscreen()
-        this.isFullScreen = false
-      }
-    },
-
     async initMap () {
       this.map = await new window.AMap.Map('container', {
         zoom: 12,
@@ -260,10 +233,12 @@ export default {
       window.currentMapInstance = this.map
       window.currentMapMarker = this.marker
 
+      // ✅ 双击地图标记也弹出面板
       this.marker.on('dblclick', () => {
         this.openDevicePanel()
       })
 
+      // 你原有地图双击下发逻辑 完全不动
       this.map.on('dblclick', (e) => {
         const lng = e.lnglat.lng
         const lat = e.lnglat.lat
@@ -272,6 +247,7 @@ export default {
     },
 
     getHeightsWidths () {
+    //  高度判断
       var contentHeight = $(window).height() - 120
       var menuHeight = $('.menubanner').outerHeight()
       $('.content').height(contentHeight)
@@ -340,13 +316,11 @@ export default {
 </script>
 
 <style scoped>
-/* 基础容器默认开启滚动，小窗口生效 */
 .screen-page {
   height: 100%;
   background: #0b1229!important;
   color: #fff;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow: auto !important; /* 始终允许滚动，小窗口自动出条，大窗口不显示 */
   display: flex!important;
   flex-direction: column;
 }
@@ -396,15 +370,15 @@ export default {
   flex: 1;
   display: flex !important;
   flex-wrap: nowrap !important;
-  padding: 15px 15px 40px 20px;
+  padding: 15px 15px 15px 20px;
   gap: 14px;
-  min-height: 860px !important;
-  height: auto !important;
+  min-height: 800px !important; /* 保证14寸非全屏能滚动到底 */
+  height: auto !important; /* 自适应高度，不依赖calc(100% - 65px) */
   box-sizing: border-box;
 }
 .left-box {
   width: 18%;
-  min-width: 220px;
+  min-width: 220px; /* 增加最小宽度，防止过窄挤压文字 */
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -425,7 +399,7 @@ export default {
   box-sizing: border-box;
   position: relative;
   background-color: #0b1229!important;
-  flex: 1;
+  flex: 1; /* 两个面板均分左侧高度，不会单个挤压另一个 */
 }
 .m-top {
   margin-top: 15px;
@@ -493,10 +467,13 @@ export default {
   padding: 0 8px;
 }
 
+/* 地图面板：彻底消除顶部/底部留白 */
 .map-panel {
   padding: 0 !important;
   height: 100% !important;
 }
+
+/* 地图容器：占满整个面板，消除底部空白 */
 .map-box {
   width: calc(100% - 20px) !important;
   height: calc(100% - 10px) !important;
@@ -540,30 +517,23 @@ export default {
   font-weight: bold;
 }
 
-/* 窗口高度≥780px（14寸及以上屏幕）：隐藏滚动条，页面铺满 */
-@media screen and (min-height: 780px) {
-  .screen-page {
-    overflow-y: hidden !important;
-  }
-  .content-screen {
-    min-height: auto !important;
-    height: calc(100% - 60px) !important;
-    padding-bottom: 15px !important;
-  }
-}
-
-/* 窗口高度＜780px（小于14寸/非全屏小窗口）：压缩布局，保留滚动 */
-@media screen and (max-height: 779px) {
+/* ========== 14寸笔记本/小高度屏幕专用适配 ========== */
+@media screen and (max-height: 800px) {
+  /* 左侧面板间距压缩 */
   .left-box {
     gap: 8px !important;
   }
   .m-top {
     margin-top: 8px !important;
   }
+
+  /* 统计网格缩小间距、内边距 */
   .stat-grid {
     gap: 12px 8px !important;
     padding: 6px 8px !important;
   }
+
+  /* 缩小所有文字字号，减少垂直占用 */
   .stat-card .num {
     font-size: 26px !important;
   }
@@ -582,15 +552,20 @@ export default {
     font-size: 15px !important;
     margin-bottom: 6px !important;
   }
+
+  /* 图表高度强制缩小，释放垂直空间 */
   .chart {
     height: 130px !important;
   }
+
+  /* 日期区域压缩边距 */
   .date-box {
     margin-bottom: 6px !important;
   }
 }
-/* 极低高度超薄本极限压缩 */
-@media screen and (max-height: 700px) {
+
+/* 1366*768 超薄本极限适配 */
+@media screen and (max-height: 768px) {
   .stat-card .num {
     font-size: 22px !important;
   }
@@ -598,37 +573,14 @@ export default {
     height: 110px !important;
   }
 }
-
-/* 浏览器全屏模式样式，覆盖后台侧边菜单 */
-.screen-full {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  z-index: 9999 !important;
-}
-.screen-full {
-  overflow: hidden !important;
-}
-.screen-full .content-screen {
-  min-height: auto !important;
-  height: calc(100% - 60px) !important;
-  padding-bottom: 15px !important;
-}
-
-/* 美化滚动条（仅小窗口可见） */
-.screen-page::-webkit-scrollbar {
-  width: 8px;
-}
-.screen-page::-webkit-scrollbar-track {
-  background: #0b1229;
-}
-.screen-page::-webkit-scrollbar-thumb {
-  background: #00ffff;
-  border-radius: 4px;
-}
-.screen-page::-webkit-scrollbar-thumb:hover {
-  background: #00d0d0;
+/* 14寸全屏/大高度窗口：隐藏滚动条，页面撑满 */
+@media screen and (min-height: 768px) {
+  .screen-page {
+    overflow: hidden !important;
+  }
+  .content-screen {
+    min-height: auto !important;
+    height: calc(100% - 65px) !important;
+  }
 }
 </style>

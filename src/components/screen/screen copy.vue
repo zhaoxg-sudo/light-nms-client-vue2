@@ -17,6 +17,7 @@
 
       <div class="top-right">
         <button class="btn">注销</button>
+        <!-- 根据全屏状态切换按钮文字 -->
         <button class="btn" @click="toggleFullScreen">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
         <button class="btn">个人后台</button>
         <div class="time">{{ nowTime }}</div>
@@ -340,13 +341,11 @@ export default {
 </script>
 
 <style scoped>
-/* 基础容器默认开启滚动，小窗口生效 */
 .screen-page {
   height: 100%;
   background: #0b1229!important;
   color: #fff;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow: auto !important;
   display: flex!important;
   flex-direction: column;
 }
@@ -540,20 +539,8 @@ export default {
   font-weight: bold;
 }
 
-/* 窗口高度≥780px（14寸及以上屏幕）：隐藏滚动条，页面铺满 */
-@media screen and (min-height: 780px) {
-  .screen-page {
-    overflow-y: hidden !important;
-  }
-  .content-screen {
-    min-height: auto !important;
-    height: calc(100% - 60px) !important;
-    padding-bottom: 15px !important;
-  }
-}
-
-/* 窗口高度＜780px（小于14寸/非全屏小窗口）：压缩布局，保留滚动 */
-@media screen and (max-height: 779px) {
+/* 小高度窗口压缩布局 */
+@media screen and (max-height: 800px) {
   .left-box {
     gap: 8px !important;
   }
@@ -589,8 +576,7 @@ export default {
     margin-bottom: 6px !important;
   }
 }
-/* 极低高度超薄本极限压缩 */
-@media screen and (max-height: 700px) {
+@media screen and (max-height: 768px) {
   .stat-card .num {
     font-size: 22px !important;
   }
@@ -598,8 +584,7 @@ export default {
     height: 110px !important;
   }
 }
-
-/* 浏览器全屏模式样式，覆盖后台侧边菜单 */
+/* 全屏模式铺满、覆盖侧边菜单 */
 .screen-full {
   position: fixed !important;
   top: 0 !important;
@@ -617,7 +602,7 @@ export default {
   padding-bottom: 15px !important;
 }
 
-/* 美化滚动条（仅小窗口可见） */
+/* 美化滚动条 */
 .screen-page::-webkit-scrollbar {
   width: 8px;
 }
