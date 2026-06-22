@@ -9,7 +9,7 @@
         </select>
         <span>设备</span>
         <select class="select">
-          <option>样机</option>
+          <option>DEMO</option>
         </select>
       </div>
 
@@ -18,7 +18,7 @@
       <div class="top-right">
         <button class="btn">注销</button>
         <button class="btn" @click="toggleFullScreen">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
-        <button class="btn">个人后台</button>
+        <button class="btn">后台</button>
         <div class="time">{{ nowTime }}</div>
       </div>
     </div>
@@ -61,7 +61,7 @@
             <span>日期</span>
             <input type="month" v-model="month" class="input-month" />
           </div>
-          <div class="chart-title">2025年8月每日有功电耗</div>
+          <div class="chart-title">2026年6月每日有功电耗</div>
           <div ref="chartLine" class="chart" style="height: 200px;"></div>
         </dv-border-box-1>
       </div>
@@ -93,7 +93,7 @@
             <tbody>
               <tr @dblclick="openDevicePanel">
                 <td>1</td>
-                <td>样机</td>
+                <td>DEMO</td>
                 <td :class="deviceOnline ? 'online' : 'offline'">
                   {{ deviceOnline ? '在线' : '离线' }}
                 </td>
@@ -625,10 +625,10 @@ export default {
   background: #0b1229;
 }
 .screen-page::-webkit-scrollbar-thumb {
-  background: #00ffff;
+  background: #78350f;
   border-radius: 4px;
 }
 .screen-page::-webkit-scrollbar-thumb:hover {
-  background: #00d0d0;
+  background: #92400e;
 }
 </style>

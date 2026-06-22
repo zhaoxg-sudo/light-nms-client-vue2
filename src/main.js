@@ -35,7 +35,7 @@ import './assets/js/common.js'
 // import './assets/js/effect.js'
 // 导入全局地址
 import { APP_HOST } from './hosts'
-// 挂载全局，所有页面直接 this.$apiHost 使用
+// 挂载全局，所有页面直接 this.$appHost 使用
 Vue.prototype.$appHost = APP_HOST
 Vue.use(dataV)
 Vue.use(ElementUI)
