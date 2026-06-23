@@ -280,7 +280,7 @@ export default {
     },
 
     getHeightsWidths () {
-      var contentHeight = $(window).height() - 110
+      var contentHeight = $(window).height() - 120
       var menuHeight = $('.menubanner').outerHeight()
       $('.content').height(contentHeight)
       $('.orgTreeList').css('top', menuHeight)
@@ -289,13 +289,13 @@ export default {
         var contentWidth = $(window).width()
         var treeWidth = $('.orgTreeList').width()
         $('.content').css('left', 0)
-        $('.content').width(contentWidth - treeWidth)
-        $('.screen-page').width(contentWidth - treeWidth)
+        $('.content').width(contentWidth - treeWidth - 10)
+        $('.screen-page').width(contentWidth - treeWidth - 10)
       } else {
         var contentWidths = $(window).width()
         $('.content').css('left', 0)
-        $('.content').width(contentWidths)
-        $('.screen-page').width(contentWidths)
+        $('.content').width(contentWidths - 10)
+        $('.screen-page').width(contentWidths - 10)
       }
     },
 
@@ -353,13 +353,13 @@ export default {
   height: 100%;
   background: #0b1229!important;
   color: #fff;
+  /* 移除overflow-y:auto，交给body全局滚动，自身不再产生滚动 */
   overflow: visible !important;
-  overflow-x: hidden !important; /* 彻底禁止横向溢出，消除右侧宽度溢出 */
+  overflow-x: hidden !important;
   display: flex!important;
   flex-direction: column;
-  box-sizing: border-box !important; /* 容器padding不撑宽高 */
-  width: 100%;
 }
+
 .top-bar {
   width: 100%;
   height: 60px;
@@ -370,7 +370,6 @@ export default {
   padding: 0 20px;
   border-bottom: 1px solid #00ffff;
   flex-shrink: 0;
-  box-sizing: border-box !important;
 }
 .top-left,
 .top-right {
@@ -403,17 +402,14 @@ export default {
 }
 
 .content-screen {
-  flex: 1 !important;
+  flex: 1;
   display: flex !important;
   flex-wrap: nowrap !important;
-  /* 修改padding：底部统一15px，不再多出40px */
-  padding: 15px;
+  padding: 15px 15px 40px 20px;
   gap: 14px;
-  /* 删除强制min-height，由flex自适应高度，解决底部溢出 */
-  min-height: unset !important;
+  min-height: 860px !important;
   height: auto !important;
   box-sizing: border-box;
-  width: 100% !important;
 }
 .left-box {
   width: 18%;
@@ -629,4 +625,6 @@ export default {
   height: calc(100% - 60px) !important;
   padding-bottom: 15px !important;
 }
+
+/* ========== 删除了全部.screen-page::-webkit-scrollbar自定义美化代码 ========== */
 </style>
