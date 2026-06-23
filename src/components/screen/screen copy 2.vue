@@ -1,3 +1,4 @@
+
 <template>
   <div class="screen-page" :class="{ 'screen-full': isFullScreen }">
     <!-- 顶部导航 -->
@@ -16,9 +17,9 @@
       <div class="top-title">LED智能照明及能源管理平台</div>
 
       <div class="top-right">
-        <button class="btn">注销</button>
-        <button class="btn" @click="toggleFullScreen">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
-        <button class="btn">后台</button>
+        <button class="btn" disabled>注销</button>
+        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
+        <button class="btn" disabled>后台</button>
         <div class="time">{{ nowTime }}</div>
       </div>
     </div>
@@ -187,6 +188,11 @@ export default {
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) {
         this.isFullScreen = false
+        // ESC退出全屏后，找到全屏按钮并失焦，取消选中高亮
+        this.$nextTick(() => {
+          const fullBtn = document.querySelector('.top-right .btn:nth-child(2)')
+          if (fullBtn) fullBtn.blur()
+        })
       }
     })
 
@@ -244,6 +250,8 @@ export default {
         await document.exitFullscreen()
         this.isFullScreen = false
       }
+      // 关键：按钮点击完成后强制失焦，清除选中高亮
+      e.target.blur()
     },
 
     async initMap () {

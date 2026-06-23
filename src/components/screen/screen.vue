@@ -1,3 +1,4 @@
+
 <template>
   <div class="screen-page" :class="{ 'screen-full': isFullScreen }">
     <!-- 顶部导航 -->
@@ -16,9 +17,9 @@
       <div class="top-title">LED智能照明及能源管理平台</div>
 
       <div class="top-right">
-        <button class="btn">注销</button>
-        <button class="btn" @click="toggleFullScreen">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
-        <button class="btn">后台</button>
+        <button class="btn" disabled>注销</button>
+        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
+        <button class="btn" disabled>后台</button>
         <div class="time">{{ nowTime }}</div>
       </div>
     </div>
@@ -187,6 +188,11 @@ export default {
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) {
         this.isFullScreen = false
+        // ESC退出全屏后，找到全屏按钮并失焦，取消选中高亮
+        this.$nextTick(() => {
+          const fullBtn = document.querySelector('.top-right .btn:nth-child(2)')
+          if (fullBtn) fullBtn.blur()
+        })
       }
     })
 
@@ -231,7 +237,7 @@ export default {
     },
 
     // 切换全屏/恢复缩放
-    async toggleFullScreen () {
+    async toggleFullScreen (e) {
       const targetDom = document.querySelector('.screen-page')
       if (!this.isFullScreen) {
         // 进入全屏
@@ -244,6 +250,8 @@ export default {
         await document.exitFullscreen()
         this.isFullScreen = false
       }
+      // 关键：按钮点击完成后强制失焦，清除选中高亮
+      e.target.blur()
     },
 
     async initMap () {
@@ -345,7 +353,8 @@ export default {
   height: 100%;
   background: #0b1229!important;
   color: #fff;
-  overflow-y: auto !important;
+  /* 移除overflow-y:auto，交给body全局滚动，自身不再产生滚动 */
+  overflow: visible !important;
   overflow-x: hidden !important;
   display: flex!important;
   flex-direction: column;
@@ -540,10 +549,10 @@ export default {
   font-weight: bold;
 }
 
-/* 窗口高度≥780px（14寸及以上屏幕）：隐藏滚动条，页面铺满 */
+/* 窗口高度≥780px（14寸及以上屏幕）：页面铺满无滚动 */
 @media screen and (min-height: 780px) {
   .screen-page {
-    overflow-y: hidden !important;
+    overflow: hidden !important;
   }
   .content-screen {
     min-height: auto !important;
@@ -552,7 +561,7 @@ export default {
   }
 }
 
-/* 窗口高度＜780px（小于14寸/非全屏小窗口）：压缩布局，保留滚动 */
+/* 窗口高度＜780px（小于14寸/非全屏小窗口）：压缩布局，滚动交给body原生 */
 @media screen and (max-height: 779px) {
   .left-box {
     gap: 8px !important;
@@ -617,18 +626,5 @@ export default {
   padding-bottom: 15px !important;
 }
 
-/* 美化滚动条（仅小窗口可见） */
-.screen-page::-webkit-scrollbar {
-  width: 8px;
-}
-.screen-page::-webkit-scrollbar-track {
-  background: #0b1229;
-}
-.screen-page::-webkit-scrollbar-thumb {
-  background: #78350f;
-  border-radius: 4px;
-}
-.screen-page::-webkit-scrollbar-thumb:hover {
-  background: #92400e;
-}
+/* ========== 删除了全部.screen-page::-webkit-scrollbar自定义美化代码 ========== */
 </style>

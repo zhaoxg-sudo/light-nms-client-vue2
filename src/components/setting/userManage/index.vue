@@ -5,7 +5,7 @@
     </div>
     <div class="groupList">
       <div class="menuType">
-        <i class="fa fa-list-ul" aria-hidden="true"></i>远程供电设备列表
+        <i class="fa fa-list-ul" aria-hidden="true"></i>LED照明设备列表
         <span><button type="button" class="btn btn-sm btn-info" @click="changeStatus">修改</button></span>
       </div>
       <tree :stationStatus="stationStatus"></tree>
