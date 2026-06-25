@@ -6,6 +6,13 @@
     @close="handleClose"
     custom-class="dark-panel-dialog"
   >
+    <!-- 自定义标题插槽，内联样式强制放大 -->
+    <template slot="title">
+      <div style="width: 100%; text-align: center;">
+        <span style="font-size: 22px; font-weight: bold; color: #00ffff; letter-spacing: 2px;">设备控制面板</span>
+      </div>
+    </template>
+
     <div class="device-panel-dark">
       <!-- 顶部设备信息栏 -->
       <div class="top-bar">
@@ -13,7 +20,7 @@
           <span class="red-dot"></span>名称/编号: 样机
         </span>
         <span class="info-item">
-          <span class="red-dot"></span>型号: 三相电表
+          <span class="red-dot"></span>型号: LT100
         </span>
         <span class="info-item">
           <span class="red-dot"></span>状态: 在线
@@ -31,8 +38,8 @@
         <el-tag type="info" class="mode-tag">模式: 手动模式</el-tag>
         <el-button size="mini" type="warning">手动控制</el-button>
         <el-button size="mini" type="primary">自动控制</el-button>
-        <el-button size="mini">更新系统时间</el-button>
-        <el-button size="mini">远程重启</el-button>
+        <el-button size="mini" type="info">更新系统时间</el-button>
+        <el-button size="mini" type="info">远程重启</el-button>
       </div>
 
       <!-- 三相电 + 功耗参数区 -->
@@ -340,5 +347,10 @@ export default {
 }
 ::v-deep .dark-panel-dialog .el-dialog__headerbtn .el-dialog__close {
   color: #fff;
+}
+::v-deep .dark-panel-dialog .el-dialog__header .el-dialog__title {
+  font-size: 46px !important;
+  font-weight: bold !important;
+  color: #00ffff !important;
 }
 </style>
