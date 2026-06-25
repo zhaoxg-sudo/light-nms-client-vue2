@@ -96,7 +96,7 @@
           <!-- <i class="el-icon-light" :class="item.status ? 'on' : 'off'"></i> -->
           <i :class="item.status ? 'on' : 'off'">{{ item.status ? '💡' : '💡' }}</i>
           <p>名称: 回路{{ item.id }}</p>
-          <p class="app-tip">应用: 通路/断路</p>
+          <p class="app-tip">控制: 通路/断路</p>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ export default {
         id: i + 1,
         status: false
       })),
-      dimmerLoops: Array.from({ length: 5 }, (_, i) => ({
+      dimmerLoops: Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
         brightness: 0
       }))
