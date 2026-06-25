@@ -16,7 +16,7 @@
           <span class="red-dot"></span>型号: 三相电表
         </span>
         <span class="info-item">
-          <span class="red-dot"></span>状态: 离线
+          <span class="red-dot"></span>状态: 在线
         </span>
       </div>
 

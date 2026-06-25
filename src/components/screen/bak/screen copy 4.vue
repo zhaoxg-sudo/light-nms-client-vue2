@@ -407,7 +407,7 @@ export default {
   display: flex !important;
   flex-wrap: nowrap !important;
   /* 修改padding：底部统一15px，不再多出40px */
-  padding: 1px;
+  padding: 10px;
   gap: 14px;
   /* 删除强制min-height，由flex自适应高度，解决底部溢出 */
   min-height: unset !important;
