@@ -35,11 +35,11 @@
         <el-button size="mini" class="btn-refresh" @click="cmdRefresh">
           <i class="el-icon-refresh"></i> 刷新
         </el-button>
-        <el-tag type="info" class="mode-tag">模式: 手动模式</el-tag>
+        <el-tag type="primary" class="mode-tag">模式: 手动模式</el-tag>
         <el-button size="mini" type="warning">手动控制</el-button>
         <el-button size="mini" type="primary">自动控制</el-button>
-        <el-button size="mini" type="info">更新系统时间</el-button>
-        <el-button size="mini" type="info">远程重启</el-button>
+        <el-button size="mini" type="primary">更新系统时间</el-button>
+        <el-button size="mini" type="primary">远程重启</el-button>
       </div>
 
       <!-- 三相电 + 功耗参数区 -->

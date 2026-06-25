@@ -660,30 +660,4 @@ export default {
     font-size: 16px !important;
   }
 }
-/* 1. 给能耗面板单独设置最小高度，防止被过度压缩 */
-.panel.m-top {
-  min-height: 220px !important; /* 小屏时保证至少有足够高度显示图表 */
-}
-
-/* 2. 小屏时，强制图表容器高度自适应，清除绝对定位 */
-@media screen and (max-width: 1366px) {
-  .m-top .chart {
-    position: static !important;
-    flex: 1 !important;
-    height: 120px !important; /* 小屏时固定图表高度，避免被挤压 */
-    min-height: 120px !important;
-  }
-}
-
-/* 3. 大屏保持原有绝对定位不变 */
-@media screen and (min-width: 1367px) {
-  .m-top .chart {
-    position: absolute;
-    top: 130px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: auto !important;
-  }
-}
 </style>

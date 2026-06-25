@@ -63,7 +63,7 @@
             <input type="month" v-model="month" class="input-month" />
           </div>
           <div class="chart-title">2026年6月每日有功电耗</div>
-          <div ref="chartLine" class="chart"></div>
+          <div ref="chartLine" class="chart" style="height: 200px;"></div>
         </dv-border-box-1>
       </div>
 
@@ -297,13 +297,6 @@ export default {
         $('.content').width(contentWidths)
         $('.screen-page').width(contentWidths)
       }
-      // 新增：图表跟随容器自动拉伸
-      this.$nextTick(() => {
-        if (this.$refs.chartLine) {
-          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-          if (chart) chart.resize()
-        }
-      })
     },
 
     updateTime () {
@@ -361,10 +354,10 @@ export default {
   background: #0b1229!important;
   color: #fff;
   overflow: visible !important;
-  overflow-x: hidden !important;
+  overflow-x: hidden !important; /* 彻底禁止横向溢出，消除右侧宽度溢出 */
   display: flex!important;
   flex-direction: column;
-  box-sizing: border-box !important;
+  box-sizing: border-box !important; /* 容器padding不撑宽高 */
   width: 100%;
 }
 .top-bar {
@@ -413,8 +406,10 @@ export default {
   flex: 1 !important;
   display: flex !important;
   flex-wrap: nowrap !important;
+  /* 修改padding：底部统一15px，不再多出40px */
   padding: 1px;
   gap: 14px;
+  /* 删除强制min-height，由flex自适应高度，解决底部溢出 */
   min-height: unset !important;
   height: auto !important;
   box-sizing: border-box;
@@ -506,6 +501,7 @@ export default {
 }
 .chart {
   width: 100%;
+  height: 180px;
   box-sizing: border-box;
   padding: 0 8px;
 }
@@ -557,7 +553,66 @@ export default {
   font-weight: bold;
 }
 
-/* 浏览器全屏模式样式 */
+/* 窗口高度≥780px（14寸及以上屏幕）：页面铺满无滚动 */
+@media screen and (min-height: 780px) {
+  .screen-page {
+    overflow: hidden !important;
+  }
+  .content-screen {
+    min-height: auto !important;
+    height: calc(100% - 60px) !important;
+    padding-bottom: 15px !important;
+  }
+}
+
+/* 窗口高度＜780px（小于14寸/非全屏小窗口）：压缩布局，滚动交给body原生 */
+@media screen and (max-height: 779px) {
+  .left-box {
+    gap: 8px !important;
+  }
+  .m-top {
+    margin-top: 8px !important;
+  }
+  .stat-grid {
+    gap: 12px 8px !important;
+    padding: 6px 8px !important;
+  }
+  .stat-card .num {
+    font-size: 26px !important;
+  }
+  .stat-card .unit {
+    font-size: 14px !important;
+    margin: 3px 0 !important;
+  }
+  .stat-card .label {
+    font-size: 16px !important;
+  }
+  .panel-title {
+    font-size: 20px !important;
+    margin-bottom: 8px !important;
+  }
+  .chart-title {
+    font-size: 15px !important;
+    margin-bottom: 6px !important;
+  }
+  .chart {
+    height: 130px !important;
+  }
+  .date-box {
+    margin-bottom: 6px !important;
+  }
+}
+/* 极低高度超薄本极限压缩 */
+@media screen and (max-height: 700px) {
+  .stat-card .num {
+    font-size: 22px !important;
+  }
+  .chart {
+    height: 110px !important;
+  }
+}
+
+/* 浏览器全屏模式样式，覆盖后台侧边菜单 */
 .screen-full {
   position: fixed !important;
   top: 0 !important;
@@ -573,117 +628,5 @@ export default {
   min-height: auto !important;
   height: calc(100% - 60px) !important;
   padding-bottom: 15px !important;
-}
-
-/* ========== 项目统计：绝对定位填满 ========== */
-::v-deep .dv-border-box-1.panel {
-  height: 100% !important;
-  position: relative !important;
-}
-.panel-title {
-  position: relative;
-  z-index: 2;
-}
-.stat-grid {
-  position: absolute;
-  top: 60px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px 12px;
-  padding: 8px 12px;
-  align-items: center;
-}
-
-/* ========== 能耗图表：绝对定位自适应填满 ========== */
-::v-deep .dv-border-box-1.panel.m-top {
-  height: 100% !important;
-  position: relative !important;
-}
-.m-top .panel-title,
-.m-top .date-box,
-.m-top .chart-title {
-  position: relative;
-  z-index: 2;
-}
-.m-top .chart {
-  position: absolute;
-  top: 130px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: auto !important;
-}
-/* 小屏（14寸及以下）项目统计修复：强制 flex 布局，保证全屏/窗口都充满 */
-@media screen and (max-width: 1366px) {
-  /* 穿透 dv-border-box-1 内部容器，强制纵向 flex */
-  ::v-deep .dv-border-box-1.panel {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  ::v-deep .dv-border-box-1 .border-box-content {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  /* 标题固定高度，不压缩 */
-  .panel-title {
-    flex-shrink: 0 !important;
-    font-size: 20px !important;
-    margin-bottom: 8px !important;
-  }
-
-  /* 统计区域自动占满剩余高度，清除绝对定位 */
-  .stat-grid {
-    flex: 1 !important;
-    position: static !important;
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 12px 8px !important;
-    padding: 6px 8px !important;
-    align-items: center !important;
-  }
-
-  /* 缩小统计数字/文字，适配小屏 */
-  .stat-card .num {
-    font-size: 26px !important;
-  }
-  .stat-card .unit {
-    font-size: 14px !important;
-    margin: 3px 0 !important;
-  }
-  .stat-card .label {
-    font-size: 16px !important;
-  }
-}
-/* 1. 给能耗面板单独设置最小高度，防止被过度压缩 */
-.panel.m-top {
-  min-height: 220px !important; /* 小屏时保证至少有足够高度显示图表 */
-}
-
-/* 2. 小屏时，强制图表容器高度自适应，清除绝对定位 */
-@media screen and (max-width: 1366px) {
-  .m-top .chart {
-    position: static !important;
-    flex: 1 !important;
-    height: 120px !important; /* 小屏时固定图表高度，避免被挤压 */
-    min-height: 120px !important;
-  }
-}
-
-/* 3. 大屏保持原有绝对定位不变 */
-@media screen and (min-width: 1367px) {
-  .m-top .chart {
-    position: absolute;
-    top: 130px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: auto !important;
-  }
 }
 </style>
