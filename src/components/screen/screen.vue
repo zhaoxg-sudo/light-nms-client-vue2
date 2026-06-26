@@ -253,32 +253,65 @@ export default {
       // 关键：按钮点击完成后强制失焦，清除选中高亮
       e.target.blur()
     },
-
     async initMap () {
-      this.map = await new window.AMap.Map('container', {
-        zoom: 12,
-        center: [116.325412, 40.042296],
-        resizeEnable: true
-      })
+      try {
+        this.map = new window.AMap.Map('container', {
+          zoom: 12,
+          center: [116.325412, 40.042296],
+          resizeEnable: true
+        })
 
-      this.marker = await new window.AMap.Marker({
-        position: [116.325412, 40.042296]
-      })
-      await this.map.add(this.marker)
-      window.currentMapInstance = this.map
-      window.currentMapMarker = this.marker
+        // 放大图标尺寸
+        const deviceIcon = new window.AMap.Icon({
+          size: new window.AMap.Size(48, 64),
+          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+          imageSize: new window.AMap.Size(48, 64)
+        })
 
-      this.marker.on('dblclick', () => {
-        this.openDevicePanel()
-      })
+        this.marker = new window.AMap.Marker({
+          position: [116.325412, 40.042296],
+          icon: deviceIcon
+        })
+        this.map.add(this.marker)
 
-      this.map.on('dblclick', (e) => {
-        const lng = e.lnglat.lng
-        const lat = e.lnglat.lat
-        console.log('🖱️ 双击点位：', lng, lat)
-      })
+        // 文字强化：字号加大+加粗+强外发光
+        const text = new window.AMap.Text({
+          position: [116.325412, 40.042296],
+          text: 'DEMO',
+          offset: new window.AMap.Pixel(16, -45), // 拉大文字与图标距离，避免重叠
+          style: {
+            color: '#00ff66',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            textShadow: '0 0 3px #000, 0 0 8px #00ff66, 0 0 12px #00ff66',
+            background: 'transparent',
+            border: 'none',
+            whiteSpace: 'nowrap'
+          }
+        })
+        this.map.add(text)
+
+        this.marker.on('moving', (e) => {
+          text.setPosition(e.lnglat)
+        })
+
+        window.currentMapInstance = this.map
+        window.currentMapMarker = this.marker
+        window.currentMapText = text
+
+        this.marker.on('dblclick', () => {
+          this.openDevicePanel()
+        })
+
+        this.map.on('dblclick', (e) => {
+          const lng = e.lnglat.lng
+          const lat = e.lnglat.lat
+          console.log('🖱️ 双击点位：', lng, lat)
+        })
+      } catch (err) {
+        console.warn('地图加载失败', err)
+      }
     },
-
     getHeightsWidths () {
       var contentHeight = $(window).height() - 110
       var menuHeight = $('.menubanner').outerHeight()
