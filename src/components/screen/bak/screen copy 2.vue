@@ -63,7 +63,7 @@
             <input type="month" v-model="month" class="input-month" />
           </div>
           <div class="chart-title">2026年6月每日有功电耗</div>
-          <div ref="chartLine" class="chart" style="height: 200px;"></div>
+          <div ref="chartLine" class="chart"></div>
         </dv-border-box-1>
       </div>
 
@@ -253,34 +253,67 @@ export default {
       // 关键：按钮点击完成后强制失焦，清除选中高亮
       e.target.blur()
     },
-
     async initMap () {
-      this.map = await new window.AMap.Map('container', {
-        zoom: 12,
-        center: [116.325412, 40.042296],
-        resizeEnable: true
-      })
+      try {
+        this.map = new window.AMap.Map('container', {
+          zoom: 12,
+          center: [116.325412, 40.042296],
+          resizeEnable: true
+        })
 
-      this.marker = await new window.AMap.Marker({
-        position: [116.325412, 40.042296]
-      })
-      await this.map.add(this.marker)
-      window.currentMapInstance = this.map
-      window.currentMapMarker = this.marker
+        // 放大图标尺寸
+        const deviceIcon = new window.AMap.Icon({
+          size: new window.AMap.Size(48, 64),
+          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+          imageSize: new window.AMap.Size(48, 64)
+        })
 
-      this.marker.on('dblclick', () => {
-        this.openDevicePanel()
-      })
+        this.marker = new window.AMap.Marker({
+          position: [116.325412, 40.042296],
+          icon: deviceIcon
+        })
+        this.map.add(this.marker)
 
-      this.map.on('dblclick', (e) => {
-        const lng = e.lnglat.lng
-        const lat = e.lnglat.lat
-        console.log('🖱️ 双击点位：', lng, lat)
-      })
+        // 文字强化：字号加大+加粗+强外发光
+        const text = new window.AMap.Text({
+          position: [116.325412, 40.042296],
+          text: 'DEMO',
+          offset: new window.AMap.Pixel(16, -45), // 拉大文字与图标距离，避免重叠
+          style: {
+            color: '#00ff66',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            textShadow: '0 0 3px #000, 0 0 8px #00ff66, 0 0 12px #00ff66',
+            background: 'transparent',
+            border: 'none',
+            whiteSpace: 'nowrap'
+          }
+        })
+        this.map.add(text)
+
+        this.marker.on('moving', (e) => {
+          text.setPosition(e.lnglat)
+        })
+
+        window.currentMapInstance = this.map
+        window.currentMapMarker = this.marker
+        window.currentMapText = text
+
+        this.marker.on('dblclick', () => {
+          this.openDevicePanel()
+        })
+
+        this.map.on('dblclick', (e) => {
+          const lng = e.lnglat.lng
+          const lat = e.lnglat.lat
+          console.log('🖱️ 双击点位：', lng, lat)
+        })
+      } catch (err) {
+        console.warn('地图加载失败', err)
+      }
     },
-
     getHeightsWidths () {
-      var contentHeight = $(window).height() - 120
+      var contentHeight = $(window).height() - 110
       var menuHeight = $('.menubanner').outerHeight()
       $('.content').height(contentHeight)
       $('.orgTreeList').css('top', menuHeight)
@@ -289,14 +322,21 @@ export default {
         var contentWidth = $(window).width()
         var treeWidth = $('.orgTreeList').width()
         $('.content').css('left', 0)
-        $('.content').width(contentWidth - treeWidth - 10)
-        $('.screen-page').width(contentWidth - treeWidth - 10)
+        $('.content').width(contentWidth - treeWidth)
+        $('.screen-page').width(contentWidth - treeWidth)
       } else {
         var contentWidths = $(window).width()
         $('.content').css('left', 0)
-        $('.content').width(contentWidths - 10)
-        $('.screen-page').width(contentWidths - 10)
+        $('.content').width(contentWidths)
+        $('.screen-page').width(contentWidths)
       }
+      // 新增：图表跟随容器自动拉伸
+      this.$nextTick(() => {
+        if (this.$refs.chartLine) {
+          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+          if (chart) chart.resize()
+        }
+      })
     },
 
     updateTime () {
@@ -353,15 +393,16 @@ export default {
   height: 100%;
   background: #0b1229!important;
   color: #fff;
-  overflow-y: auto !important;
+  overflow: visible !important;
   overflow-x: hidden !important;
   display: flex!important;
   flex-direction: column;
+  box-sizing: border-box !important;
+  width: 100%;
 }
-
 .top-bar {
   width: 100%;
-  height: 60px;
+  height: 40px;
   background: linear-gradient(to right, #031c3e, #062a5c);
   display: flex;
   align-items: center;
@@ -369,6 +410,7 @@ export default {
   padding: 0 20px;
   border-bottom: 1px solid #00ffff;
   flex-shrink: 0;
+  box-sizing: border-box !important;
 }
 .top-left,
 .top-right {
@@ -401,14 +443,15 @@ export default {
 }
 
 .content-screen {
-  flex: 1;
+  flex: 1 !important;
   display: flex !important;
   flex-wrap: nowrap !important;
-  padding: 15px 15px 40px 20px;
+  padding: 1px;
   gap: 14px;
-  min-height: 860px !important;
+  min-height: unset !important;
   height: auto !important;
   box-sizing: border-box;
+  width: 100% !important;
 }
 .left-box {
   width: 18%;
@@ -496,7 +539,6 @@ export default {
 }
 .chart {
   width: 100%;
-  height: 180px;
   box-sizing: border-box;
   padding: 0 8px;
 }
@@ -548,66 +590,7 @@ export default {
   font-weight: bold;
 }
 
-/* 窗口高度≥780px（14寸及以上屏幕）：隐藏滚动条，页面铺满 */
-@media screen and (min-height: 780px) {
-  .screen-page {
-    overflow-y: hidden !important;
-  }
-  .content-screen {
-    min-height: auto !important;
-    height: calc(100% - 60px) !important;
-    padding-bottom: 15px !important;
-  }
-}
-
-/* 窗口高度＜780px（小于14寸/非全屏小窗口）：压缩布局，保留滚动 */
-@media screen and (max-height: 779px) {
-  .left-box {
-    gap: 8px !important;
-  }
-  .m-top {
-    margin-top: 8px !important;
-  }
-  .stat-grid {
-    gap: 12px 8px !important;
-    padding: 6px 8px !important;
-  }
-  .stat-card .num {
-    font-size: 26px !important;
-  }
-  .stat-card .unit {
-    font-size: 14px !important;
-    margin: 3px 0 !important;
-  }
-  .stat-card .label {
-    font-size: 16px !important;
-  }
-  .panel-title {
-    font-size: 20px !important;
-    margin-bottom: 8px !important;
-  }
-  .chart-title {
-    font-size: 15px !important;
-    margin-bottom: 6px !important;
-  }
-  .chart {
-    height: 130px !important;
-  }
-  .date-box {
-    margin-bottom: 6px !important;
-  }
-}
-/* 极低高度超薄本极限压缩 */
-@media screen and (max-height: 700px) {
-  .stat-card .num {
-    font-size: 22px !important;
-  }
-  .chart {
-    height: 110px !important;
-  }
-}
-
-/* 浏览器全屏模式样式，覆盖后台侧边菜单 */
+/* 浏览器全屏模式样式 */
 .screen-full {
   position: fixed !important;
   top: 0 !important;
@@ -625,18 +608,115 @@ export default {
   padding-bottom: 15px !important;
 }
 
-/* 美化滚动条（仅小窗口可见） */
-.screen-page::-webkit-scrollbar {
-  width: 8px;
+/* ========== 项目统计：绝对定位填满 ========== */
+::v-deep .dv-border-box-1.panel {
+  height: 100% !important;
+  position: relative !important;
 }
-.screen-page::-webkit-scrollbar-track {
-  background: #0b1229;
+.panel-title {
+  position: relative;
+  z-index: 2;
 }
-.screen-page::-webkit-scrollbar-thumb {
-  background: #78350f;
-  border-radius: 4px;
+.stat-grid {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 12px;
+  padding: 8px 12px;
+  align-items: center;
 }
-.screen-page::-webkit-scrollbar-thumb:hover {
-  background: #92400e;
+
+/* ========== 能耗图表：绝对定位自适应填满 ========== */
+::v-deep .dv-border-box-1.panel.m-top {
+  height: 100% !important;
+  position: relative !important;
+}
+.m-top .panel-title,
+.m-top .date-box,
+.m-top .chart-title {
+  position: relative;
+  z-index: 2;
+}
+.m-top .chart {
+  position: absolute;
+  top: 130px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto !important;
+}
+/* 小屏（14寸及以下）项目统计修复：强制 flex 布局，保证全屏/窗口都充满 */
+@media screen and (max-width: 1366px) {
+  /* 穿透 dv-border-box-1 内部容器，强制纵向 flex */
+  ::v-deep .dv-border-box-1.panel {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  ::v-deep .dv-border-box-1 .border-box-content {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* 标题固定高度，不压缩 */
+  .panel-title {
+    flex-shrink: 0 !important;
+    font-size: 20px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* 统计区域自动占满剩余高度，清除绝对定位 */
+  .stat-grid {
+    flex: 1 !important;
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px 8px !important;
+    padding: 6px 8px !important;
+    align-items: center !important;
+  }
+
+  /* 缩小统计数字/文字，适配小屏 */
+  .stat-card .num {
+    font-size: 26px !important;
+  }
+  .stat-card .unit {
+    font-size: 14px !important;
+    margin: 3px 0 !important;
+  }
+  .stat-card .label {
+    font-size: 16px !important;
+  }
+}
+/* 1. 给能耗面板单独设置最小高度，防止被过度压缩 */
+.panel.m-top {
+  min-height: 220px !important; /* 小屏时保证至少有足够高度显示图表 */
+}
+
+/* 2. 小屏时，强制图表容器高度自适应，清除绝对定位 */
+@media screen and (max-width: 1366px) {
+  .m-top .chart {
+    position: static !important;
+    flex: 1 !important;
+    height: 120px !important; /* 小屏时固定图表高度，避免被挤压 */
+    min-height: 120px !important;
+  }
+}
+
+/* 3. 大屏保持原有绝对定位不变 */
+@media screen and (min-width: 1367px) {
+  .m-top .chart {
+    position: absolute;
+    top: 130px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: auto !important;
+  }
 }
 </style>

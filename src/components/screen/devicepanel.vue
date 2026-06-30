@@ -150,6 +150,7 @@ export default {
       this.$emit('update:visible', false)
     },
     async sendCmd (content) {
+      content = content + '\r\n'
       if (!this.remoteId) {
         this.$message.warning('未获取到远端ID')
         return
