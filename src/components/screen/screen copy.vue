@@ -1,4 +1,3 @@
-
 <template>
   <div class="screen-page" :class="{ 'screen-full': isFullScreen }">
     <!-- 顶部导航 -->
@@ -17,9 +16,10 @@
       <div class="top-title">LED智能照明及能源管理平台</div>
 
       <div class="top-right">
-        <button class="btn" disabled>注销</button>
+        <button class="btn" @click="refreshAll">刷新</button>
         <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
         <button class="btn" disabled>后台</button>
+         <button class="btn" disabled>注销</button>
         <div class="time">{{ nowTime }}</div>
       </div>
     </div>
@@ -132,6 +132,7 @@ export default {
       timer: null,
       map: null,
       marker: null,
+      textLabel: null, // 设备文字标签
       deviceOnline: false,
       remoteId: '',
       lastGps: null,
@@ -153,16 +154,22 @@ export default {
     if (this.sockets) {
       this.sockets.unsubscribe('gps')
 
-      this.sockets.subscribe('gps', (data) => {
-        console.log('🔥 实时收到GPS ===>', data)
-        window.latestGpsData = data
-        this.remoteId = data.clientKey
+      this.sockets.subscribe('gps', (rawGpsData) => {
+        console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
+        window.latestGpsData = rawGpsData
+        this.remoteId = rawGpsData.clientKey
         this.deviceOnline = true
+        this.lastGps = rawGpsData
 
-        if (window.currentMapInstance && window.currentMapMarker) {
-          const point = new window.AMap.LngLat(data.lng, data.lat)
-          window.currentMapMarker.setPosition(point)
-          window.currentMapInstance.setCenter(point)
+        // 核心改造：WGS84原始坐标 → GCJ02高德坐标
+        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawGpsData.lng, rawGpsData.lat)
+        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+
+        if (this.map && this.marker && this.textLabel) {
+          const point = new window.AMap.LngLat(gcjLng, gcjLat)
+          this.marker.setPosition(point)
+          this.textLabel.setPosition(point)
+          this.map.setCenter(point)
         }
       })
 
@@ -196,12 +203,15 @@ export default {
       }
     })
 
+    // 页面缓存有历史GPS，初始化点位
     if (window.latestGpsData) {
-      const data = window.latestGpsData
-      this.remoteId = data.clientKey
+      const rawData = window.latestGpsData
+      this.remoteId = rawData.clientKey
       this.deviceOnline = true
-      const point = new window.AMap.LngLat(data.lng, data.lat)
+      const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawData.lng, rawData.lat)
+      const point = new window.AMap.LngLat(gcjLng, gcjLat)
       this.marker.setPosition(point)
+      this.textLabel.setPosition(point)
       this.map.setCenter(point)
     }
   },
@@ -224,10 +234,57 @@ export default {
     }
     window.currentMapInstance = null
     window.currentMapMarker = null
+    window.currentMapText = null
   },
 
   sockets: {},
   methods: {
+    refreshAll () {
+      // 浏览器原生重载整个页面，等同于F5刷新
+      window.location.reload()
+    },
+    // ===================== 新增：WGS84转GCJ02 高德坐标转换函数 =====================
+    wgs84ToGcj02 (wgsLon, wgsLat) {
+      const PI = 3.1415926535897932384626
+      const a = 6378245.0
+      const ee = 0.00669342162296594323
+
+      // 判断是否在中国境内
+      const outOfChina = (lon, lat) => {
+        return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
+      }
+      if (outOfChina(wgsLon, wgsLat)) {
+        return [wgsLon, wgsLat]
+      }
+
+      const transformLat = (x, y) => {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+        ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+        ret += (160.0 * Math.sin(y / 12.0 * PI) + 320.0 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+        return ret
+      }
+      const transformLon = (x, y) => {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+        ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+        ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
+        return ret
+      }
+
+      let dLat = transformLat(wgsLon - 105.0, wgsLat - 35.0)
+      let dLon = transformLon(wgsLon - 105.0, wgsLat - 35.0)
+      const radLat = wgsLat / 180.0 * PI
+      const magic = Math.sin(radLat)
+      const magic2 = 1 - ee * magic * magic
+      const sqrtMagic = Math.sqrt(magic2)
+      dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic2 * sqrtMagic) * PI)
+      dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
+      const gcjLat = wgsLat + dLat
+      const gcjLon = wgsLon + dLon
+      return [gcjLon, gcjLat]
+    },
+
     openDevicePanel () {
       if (!this.remoteId) {
         alert('未获取到远端ID')
@@ -255,9 +312,12 @@ export default {
     },
     async initMap () {
       try {
+        // 初始坐标：光华创业园 GCJ02 高德坐标
+        const initLng = 116.331644
+        const initLat = 40.043262
         this.map = new window.AMap.Map('container', {
           zoom: 12,
-          center: [116.331644, 40.043262],
+          center: [initLng, initLat],
           resizeEnable: true
         })
 
@@ -269,14 +329,14 @@ export default {
         })
 
         this.marker = new window.AMap.Marker({
-          position: [116.331644, 40.043262],
+          position: [initLng, initLat],
           icon: deviceIcon
         })
         this.map.add(this.marker)
 
         // 文字强化：字号加大+加粗+强外发光
-        const text = new window.AMap.Text({
-          position: [116.331644, 40.043262],
+        this.textLabel = new window.AMap.Text({
+          position: [initLng, initLat],
           text: 'DEMO',
           offset: new window.AMap.Pixel(16, -45), // 拉大文字与图标距离，避免重叠
           style: {
@@ -289,15 +349,16 @@ export default {
             whiteSpace: 'nowrap'
           }
         })
-        this.map.add(text)
+        this.map.add(this.textLabel)
 
+        // 修复：marker移动同步更新文字位置
         this.marker.on('moving', (e) => {
-          text.setPosition(e.lnglat)
+          this.textLabel.setPosition(e.lnglat)
         })
 
         window.currentMapInstance = this.map
         window.currentMapMarker = this.marker
-        window.currentMapText = text
+        window.currentMapText = this.textLabel
 
         this.marker.on('dblclick', () => {
           this.openDevicePanel()
@@ -306,7 +367,10 @@ export default {
         this.map.on('dblclick', (e) => {
           const lng = e.lnglat.lng
           const lat = e.lnglat.lat
-          console.log('🖱️ 双击点位：', lng, lat)
+          console.log('🖱️ 双击地图点位(WGS84):', lng, lat)
+          // 双击点位也可自动转换高德坐标
+          const [gcjL, gcjLa] = this.wgs84ToGcj02(lng, lat)
+          console.log('双击点位转换GCJ02:', gcjL, gcjLa)
         })
       } catch (err) {
         console.warn('地图加载失败', err)

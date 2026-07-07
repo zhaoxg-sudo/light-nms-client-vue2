@@ -16,9 +16,10 @@
       <div class="top-title">LED智能照明及能源管理平台</div>
 
       <div class="top-right">
-        <button class="btn" disabled>注销</button>
+        <button class="btn" @click="refreshAll">刷新</button>
         <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
         <button class="btn" disabled>后台</button>
+         <button class="btn" disabled>注销</button>
         <div class="time">{{ nowTime }}</div>
       </div>
     </div>
@@ -238,6 +239,10 @@ export default {
 
   sockets: {},
   methods: {
+    refreshAll () {
+      // 浏览器原生重载整个页面，等同于F5刷新
+      window.location.reload()
+    },
     // ===================== 新增：WGS84转GCJ02 高德坐标转换函数 =====================
     wgs84ToGcj02 (wgsLon, wgsLat) {
       const PI = 3.1415926535897932384626

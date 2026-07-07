@@ -39,6 +39,8 @@ import { APP_HOST } from './hosts'
 Vue.prototype.$appHost = APP_HOST
 Vue.use(dataV)
 Vue.use(ElementUI)
+// 全局设置消息弹窗最高层级
+// ElementUI.Message.defaults.zIndex = 100000
 // web socket
 Vue.use(new VueSocketio({
   debug: false,

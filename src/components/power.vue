@@ -27,7 +27,7 @@ export default {
       devicelist: [],
       username: '',
       instance: this.$ajax.create({
-        baseURL: 'http://123.57.87.144:7001/'
+        baseURL: this.$appHost
       })
     }
   },
