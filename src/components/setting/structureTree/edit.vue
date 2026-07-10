@@ -77,10 +77,7 @@
                   <input type="radio" value="0" v-model="upData.stationtype">站点组织
                 </label>
                 <label class="radio-inline">
-                  <input type="radio" value="1" v-model="upData.stationtype">电源发生器
-                </label>
-                <label class="radio-inline">
-                  <input type="radio" value="2" v-model="upData.stationtype">电源转换器
+                  <input type="radio" value="1" v-model="upData.stationtype">LED直流柜
                 </label>
               </div>
             </div>

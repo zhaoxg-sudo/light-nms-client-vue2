@@ -142,7 +142,10 @@ export default {
       dimmerLoops: Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
         brightness: 0
-      }))
+      })),
+      instance: this.$ajax.create({
+        baseURL: this.$appHost
+      })
     }
   },
   methods: {
@@ -155,17 +158,32 @@ export default {
         this.$message.warning('未获取到远端ID')
         return
       }
-      try {
-        await fetch(this.$appHost + '/api/tcp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientKey: this.remoteId, content })
-        })
+      let items = {}
+      items.clientKey = this.remoteId
+      items.content = content
+      this.instance({
+        url: '/api/tcp/send',
+        method: 'post',
+        data: items
+        // data: JSON.stringify({ clientKey: this.remoteId, content: content })
+      }).then(res => {
+        console.log('指令发送成功！', res)
         this.$message.success('指令下发成功')
-      } catch (e) {
-        this.$message.error('指令下发失败')
-        console.error(e)
-      }
+        console.log('指令返回信息:', res.data.msg)
+        let msg = '指令返回:' + res.data.msg
+        this.$message.success(msg)
+      })
+      // try {
+      //   await fetch(this.$appHost + '/api/tcp/send', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ clientKey: this.remoteId, content })
+      //   })
+      //   this.$message.success('指令下发成功')
+      // } catch (e) {
+      //   this.$message.error('指令下发失败')
+      //   console.error(e)
+      // }
     },
     async cmdAllOn () {
       this.switchLoops.forEach((item) => {
