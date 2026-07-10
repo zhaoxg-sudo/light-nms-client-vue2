@@ -167,11 +167,17 @@ export default {
         data: items
         // data: JSON.stringify({ clientKey: this.remoteId, content: content })
       }).then(res => {
-        console.log('指令发送成功！', res)
+        console.log('指令收到应答！', res)
         this.$message.success('指令下发成功')
         console.log('指令返回信息:', res.data.msg)
-        let msg = '指令返回:' + res.data.msg
-        this.$message.success(msg)
+        let msg = '指令应答返回:' + res.data.msg
+        if (res.data.data.code === 1) {
+          this.$message.success(msg)
+        } else if (res.data.data.code === -1) {
+          this.$message.warning(msg)
+        } else if (res.data.data.code === 0) {
+          this.$message.warning(msg)
+        }
       })
       // try {
       //   await fetch(this.$appHost + '/api/tcp/send', {
