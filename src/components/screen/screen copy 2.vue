@@ -19,7 +19,7 @@
         <button class="btn" @click="refreshAll">刷新</button>
         <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
         <button class="btn" disabled>后台</button>
-        <button class="btn" disabled>注销</button>
+         <button class="btn" disabled>注销</button>
         <div class="time">{{ nowTime }}</div>
       </div>
     </div>
@@ -87,7 +87,7 @@
             <div class="map-point-list" v-if="manualPointList.length > 0">
               <div class="list-title">已添加点位({{manualPointList.length}})</div>
               <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
-                <span>{{idx+1}} {{item.name}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}</span>
+                <span>{{idx+1}} GCJ:{{item.lng}},{{item.lat}}</span>
                 <button @click="removePoint(idx)">删除</button>
               </div>
             </div>
@@ -130,29 +130,6 @@
       :visible.sync="showDevicePanel"
       :remoteId="remoteId"
     />
-
-    <!-- 新增：添加点位弹窗（归属/名称/ID输入） -->
-    <div class="point-mask" v-if="showPointDialog">
-      <div class="point-dialog">
-        <div class="dialog-header">新增点位</div>
-        <div class="form-row">
-          <label>归属区域：</label>
-          <input v-model="tempPoint.belong" placeholder="请输入归属区域" />
-        </div>
-        <div class="form-row">
-          <label>点位名称：</label>
-          <input v-model="tempPoint.name" placeholder="请输入点位名称" />
-        </div>
-        <div class="form-row">
-          <label>点位ID：</label>
-          <input v-model="tempPoint.id" placeholder="请输入唯一点位ID" />
-        </div>
-        <div class="dialog-btns">
-          <button class="btn-cancel" @click="closePointDialog">取消</button>
-          <button class="btn-confirm" @click="confirmAddPoint">确认添加</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -185,18 +162,7 @@ export default {
       manualPointList: [],
       manualMarkers: [],
       drawPointMode: false,
-      userPermissions: ['point:edit', 'device:read'],
-      // 新增点位弹窗数据
-      showPointDialog: false,
-      tempPoint: {
-        belong: '',
-        name: '',
-        id: '',
-        lng: '',
-        lat: '',
-        wgsLng: '',
-        wgsLat: ''
-      }
+      userPermissions: ['point:edit', 'device:read']
     }
   },
   computed: {
@@ -268,6 +234,7 @@ export default {
       const point = new window.AMap.LngLat(gcjLng, gcjLat)
       this.marker.setPosition(point)
       this.textLabel.setPosition(point)
+      this.map.setCenter(point)
     }
   },
 
@@ -318,7 +285,7 @@ export default {
         let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
         ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
         ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
-        ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0)) * 2.0 / 3.0
+        ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
         return ret
       }
 
@@ -360,7 +327,7 @@ export default {
     toggleDrawMode () {
       this.drawPointMode = !this.drawPointMode
       if (this.drawPointMode) {
-        alert('已开启点位配置，点击地图任意位置弹出录入窗口')
+        alert('已开启点位配置，点击地图任意位置添加点位')
       }
     },
 
@@ -368,30 +335,6 @@ export default {
       this.manualMarkers.forEach(marker => this.map.remove(marker))
       this.manualMarkers = []
       this.manualPointList = []
-    },
-
-    // 关闭点位弹窗，清空表单
-    closePointDialog () {
-      this.showPointDialog = false
-      this.tempPoint = {
-        belong: '',
-        name: '',
-        id: '',
-        lng: '',
-        lat: '',
-        wgsLng: '',
-        wgsLat: ''
-      }
-    },
-
-    // 弹窗确认新增点位
-    confirmAddPoint () {
-      if (!this.tempPoint.belong || !this.tempPoint.name || !this.tempPoint.id) {
-        alert('归属、点位名称、ID不能为空！')
-        return
-      }
-      this.addManualMarker(this.tempPoint)
-      this.closePointDialog()
     },
 
     async initMap () {
@@ -404,7 +347,6 @@ export default {
           resizeEnable: true
         })
 
-        // 设备绿色标记（SVG base64无外网依赖）
         const deviceIcon = new window.AMap.Icon({
           size: new window.AMap.Size(48, 64),
           image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
@@ -440,22 +382,21 @@ export default {
           this.openDevicePanel()
         })
 
-        // 地图单击打开弹窗录入点位信息
         this.map.on('click', (e) => {
           if (!this.drawPointMode) return
-          const rawLng = e.lnglat.lng.toFixed(6)
-          const rawLat = e.lnglat.lat.toFixed(6)
-          const [wgsLng, wgsLat] = this.gcj02ToWgs84(rawLng, rawLat)
-          // 填充坐标至临时表单
-          this.tempPoint.lng = rawLng
-          this.tempPoint.lat = rawLat
-          this.tempPoint.wgsLng = wgsLng.toFixed(6)
-          this.tempPoint.wgsLat = wgsLat.toFixed(6)
-          this.showPointDialog = true
+          const rawLng = e.lnglat.lng
+          const rawLat = e.lnglat.lat
+          const pointInfo = {
+            lng: rawLng.toFixed(6),
+            lat: rawLat.toFixed(6),
+            wgsLng: this.gcj02ToWgs84(rawLng, rawLat)[0].toFixed(6),
+            wgsLat: this.gcj02ToWgs84(rawLng, rawLat)[1].toFixed(6)
+          }
+          this.addManualMarker(pointInfo)
         })
 
         this.map.on('dblclick', (e) => {
-          const lng = e.lnglat.lng
+          const lng = e.lnglat.lat
           const lat = e.lnglat.lat
           const [gcjL, gcjLa] = this.wgs84ToGcj02(lng, lat)
           console.log('双击点位GCJ02:', gcjL, gcjLa)
@@ -465,21 +406,17 @@ export default {
       }
     },
 
-    // 创建手动点位：替换外网图片为内联橙色SVG，解决图片加载失败
     addManualMarker (pointInfo) {
-      // 橙色点位SVG base64，无外网依赖
-      const orangeSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAzNiA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTggMyBDMjYuIDMgMzQgMTEuIDM0IDIwIEMzNCAzMiAxOCA0NSAxOCA0NSBDMTggNDUgMiAzMiAyIDIwIEMyIDExIDEwIDMgMTggMnoiIGZpbGw9IiNmNzgwMDAvLz48L3N2Zz4='
-      const orangeIcon = new window.AMap.Icon({
-        size: new window.AMap.Size(36, 48),
-        image: orangeSvg,
-        imageSize: new window.AMap.Size(36, 48)
-      })
       const marker = new window.AMap.Marker({
         position: [pointInfo.lng, pointInfo.lat],
-        icon: orangeIcon
+        icon: new window.AMap.Icon({
+          size: new window.AMap.Size(36, 48),
+          imageSize: new window.AMap.Size(36, 48),
+          image: 'https://a.amap.com/jsapi/static/image/plugin/marker_orange.png'
+        })
       })
       marker.on('click', () => {
-        const info = `归属：${pointInfo.belong}\n名称：${pointInfo.name}\nID：${pointInfo.id}\nGCJ：${pointInfo.lng},${pointInfo.lat}\nWGS：${pointInfo.wgsLng},${pointInfo.wgsLat}`
+        const info = `GCJ02:${pointInfo.lng},${pointInfo.lat}\nWGS84:${pointInfo.wgsLng},${pointInfo.wgsLat}`
         const win = new window.AMap.InfoWindow({
           content: info
         })
@@ -498,8 +435,7 @@ export default {
 
     saveAllPoints () {
       console.log('待保存点位集合', this.manualPointList)
-      alert(`共${this.manualPointList.length}个点位，数据已打印控制台`)
-      // axios.post('/api/savePoint', { list: this.manualPointList })
+      alert(`共${this.manualPointList.length}个点位，已输出控制台，可对接保存接口`)
     },
 
     gcj02ToWgs84 (gcjLon, gcjLat) {
@@ -976,66 +912,4 @@ export default {
     bottom: 0;
   }
 }
-/* 点位弹窗遮罩+样式 */
-.point-mask {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.point-dialog {
-  width: 440px;
-  background: #0b1229;
-  border: 1px solid #00ffff;
-  padding: 24px;
-  border-radius: 6px;
-}
-.dialog-header {
-  font-size: 20px;
-  color: #00ffff;
-  text-align: center;
-  margin-bottom: 20px;
-}
-.form-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-.form-row label {
-  width: 95px;
-  color: #fff;
-}
-.form-row input {
-  flex: 1;
-  height: 36;
-  background: #0b2a5a;
-  border: 1px solid #00ffff;
-  color: #fff;
-  padding: 0 10px;
-}
-.dialog-btns {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-.btn-cancel {
-  padding: 6px 16px;
-  background: #555;
-  border: none;
-  color: #fff;
-}
-.btn-confirm {
-  padding: 6px 16px;
-  background: #00c48c;
-  border: none;
-  color: #000;
-}
-
 </style>
