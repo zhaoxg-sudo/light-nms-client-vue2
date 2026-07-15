@@ -13,7 +13,7 @@
         </select>
       </div>
 
-      <div class="top-title">LED智慧照明管理平台</div>
+      <div class="top-title">LED智能照明及能源管理平台</div>
 
       <div class="top-right">
         <button class="btn" @click="refreshAll">刷新</button>
@@ -82,22 +82,15 @@
               </button>
               <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
               <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
-              <button class="tool-btn" @click="locatePoint">定位点位</button>
             </div>
             <!-- 手动点位列表悬浮面板 -->
             <div class="map-point-list" v-if="manualPointList.length > 0">
-            <div class="list-title">已添加点位({{manualPointList.length}})</div>
-            <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
-              <span
-                @click="locatePointByIndex(idx)"
-                style="cursor:pointer;"
-                title="鼠标点击，定位该点位"
-              >
-                {{idx+1}} | {{item.name}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}
-              </span>
-              <button @click="removePoint(idx)">删除</button>
+              <div class="list-title">已添加点位({{manualPointList.length}})</div>
+              <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
+                <span>{{idx+1}} {{item.name}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}</span>
+                <button @click="removePoint(idx)">删除</button>
+              </div>
             </div>
-          </div>
           </div>
         </dv-border-box-1>
       </div>
@@ -372,10 +365,7 @@ export default {
     },
 
     clearAllManualPoint () {
-      this.manualMarkers.forEach(item => {
-        this.map.remove(item.marker)
-        this.map.remove(item.label)
-      })
+      this.manualMarkers.forEach(marker => this.map.remove(marker))
       this.manualMarkers = []
       this.manualPointList = []
     },
@@ -449,23 +439,6 @@ export default {
         this.marker.on('dblclick', () => {
           this.openDevicePanel()
         })
-        // 主设备悬浮弹窗
-        const mainInfoWin = new window.AMap.InfoWindow({
-          content: `
-            <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
-              <div>ID：${this.remoteId || 'DEMO'}</div>
-              <div>名称：DEMO主设备</div>
-            </div>
-          `,
-          offset: new window.AMap.Pixel(0, -55),
-          anchor: 'bottom-center'
-        })
-        this.marker.on('mouseover', () => {
-          mainInfoWin.open(this.map, this.marker.getPosition())
-        })
-        this.marker.on('mouseout', () => {
-          mainInfoWin.close()
-        })
 
         // 地图单击打开弹窗录入点位信息
         this.map.on('click', (e) => {
@@ -492,84 +465,33 @@ export default {
       }
     },
 
+    // 创建手动点位：替换外网图片为内联橙色SVG，解决图片加载失败
     addManualMarker (pointInfo) {
-      // 转为纯数字坐标
-      const lng = parseFloat(pointInfo.lng)
-      const lat = parseFloat(pointInfo.lat)
-
-      // 橙色标记（SVG base64无外网依赖）
-      const orangeDeviceIcon = new window.AMap.Icon({
-        size: new window.AMap.Size(48, 64),
-        image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiNmNzgwMDAiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzIwMDgwMCIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiNmNzgwMDAiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2UtZGFzaGFwPSIyIiBmaWxsPSJub25lIi8+CiAgPHJlY3QgeD0iLTYiIHk9IjM4IiB3aWR0aD0iOCIgaGVpZ2h0PSIxNiIgcng9IjIiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLWRhc2hhcD0iMiIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4=',
-        imageSize: new window.AMap.Size(48, 64)
+      // 橙色点位SVG base64，无外网依赖
+      const orangeSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAzNiA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTggMyBDMjYuIDMgMzQgMTEuIDM0IDIwIEMzNCAzMiAxOCA0NSAxOCA0NSBDMTggNDUgMiAzMiAyIDIwIEMyIDExIDEwIDMgMTggMnoiIGZpbGw9IiNmNzgwMDAvLz48L3N2Zz4='
+      const orangeIcon = new window.AMap.Icon({
+        size: new window.AMap.Size(36, 48),
+        image: orangeSvg,
+        imageSize: new window.AMap.Size(36, 48)
       })
-
-      // this.marker = new window.AMap.Marker({
-      //   position: [initLng, initLat],
-      //   icon: orangeDeviceIcon
-      // })
       const marker = new window.AMap.Marker({
-        position: [lng, lat],
-        icon: orangeDeviceIcon
-      })
-      // ====== 点位左上角文字标签======
-      const pointTextLabel = new window.AMap.Text({
-        position: [lng, lat],
-        text: pointInfo.name,
-        offset: new window.AMap.Pixel(-3, -45),
-        style: {
-          color: '#ff7800',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          textShadow: '0 0 3px #000',
-          whiteSpace: 'nowrap'
-        }
-      })
-      // 悬浮信息窗口
-      const hoverInfoWin = new window.AMap.InfoWindow({
-        content: `
-          <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
-            <div>ID：${pointInfo.id}</div>
-            <div>名称：${pointInfo.name}</div>
-            <div>归属：${pointInfo.belong}</div>
-            <div>GCJ经纬度：${lng},${lat}</div>
-            <div>WGS经纬度：${pointInfo.wgsLng},${pointInfo.wgsLat}</div>
-          </div>
-        `,
-        offset: new window.AMap.Pixel(0, -35)
-      })
-      marker.on('mouseover', () => {
-        hoverInfoWin.open(this.map, marker.getPosition())
-      })
-      marker.on('mouseout', () => {
-        hoverInfoWin.close()
+        position: [pointInfo.lng, pointInfo.lat],
+        icon: orangeIcon
       })
       marker.on('click', () => {
-        const clickInfoWin = new window.AMap.InfoWindow({
-          content: `归属：${pointInfo.belong}\n名称：${pointInfo.name}\nID：${pointInfo.id}\nGCJ：${lng},${lat}\nWGS：${pointInfo.wgsLng},${pointInfo.wgsLat}`
+        const info = `归属：${pointInfo.belong}\n名称：${pointInfo.name}\nID：${pointInfo.id}\nGCJ：${pointInfo.lng},${pointInfo.lat}\nWGS：${pointInfo.wgsLng},${pointInfo.wgsLat}`
+        const win = new window.AMap.InfoWindow({
+          content: info
         })
-        clickInfoWin.open(this.map, marker.getPosition())
+        win.open(this.map, marker.getPosition())
       })
-
-      // ✅ 存入数组（确保this指向正确Vue实例）
       this.map.add(marker)
-      this.map.add(pointTextLabel)
-      this.manualMarkers.push({marker, label: pointTextLabel})
-      this.manualPointList.push({
-        ...pointInfo,
-        lng: lng,
-        lat: lat
-      })
-
-      // ✅ 自动定位到新点位
-      this.map.setZoomAndCenter(15, [lng, lat])
-      console.log('✅ 点位添加成功', this.manualPointList, this.manualMarkers)
+      this.manualMarkers.push(marker)
+      this.manualPointList.push(pointInfo)
     },
 
     removePoint (index) {
-      const item = this.manualMarkers[index]
-      this.map.remove(item.marker)
-      this.map.remove(item.label)
+      this.map.remove(this.manualMarkers[index])
       this.manualMarkers.splice(index, 1)
       this.manualPointList.splice(index, 1)
     },
@@ -578,19 +500,6 @@ export default {
       console.log('待保存点位集合', this.manualPointList)
       alert(`共${this.manualPointList.length}个点位，数据已打印控制台`)
       // axios.post('/api/savePoint', { list: this.manualPointList })
-    },
-    // 根据索引定位点位
-    locatePointByIndex (idx) {
-      const point = this.manualPointList[idx]
-      const lng = parseFloat(point.lng)
-      const lat = parseFloat(point.lat)
-      this.map.setZoomAndCenter(16, [lng, lat]) // zoom可按需调整
-    },
-    locatePoint () {
-      if (this.manualPointList.length === 0) return
-      const firstPoint = this.manualPointList[0]
-      this.map.setCenter([firstPoint.lng, firstPoint.lat])
-      this.map.setZoom(14)
     },
 
     gcj02ToWgs84 (gcjLon, gcjLat) {
