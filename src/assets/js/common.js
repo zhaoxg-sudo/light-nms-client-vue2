@@ -1,6 +1,6 @@
 import Vue from 'vue'
 import axios from 'axios'
-let api = 'http://power.ieyeplus.com:7001/'
+let api = 'http://123.57.87.144:7001/'
 axios.defaults.baseURL = api
 
 Vue.Api = api

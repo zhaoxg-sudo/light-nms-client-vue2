@@ -13,7 +13,7 @@
         </select>
       </div>
 
-      <div class="top-title">LED智能照明及能源管理平台</div>
+      <div class="top-title">LED智慧照明管理平台</div>
 
       <div class="top-right">
         <button class="btn" @click="refreshAll">刷新</button>
@@ -86,12 +86,32 @@
             </div>
             <!-- 手动点位列表悬浮面板 -->
             <div class="map-point-list" v-if="manualPointList.length > 0">
-              <div class="list-title">已添加点位({{manualPointList.length}})</div>
-              <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
-                <span>{{idx+1}} {{item.name}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}</span>
-                <button @click="removePoint(idx)">删除</button>
-              </div>
+            <div class="list-title">已添加点位({{manualPointList.length}})</div>
+            <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
+              <span
+                @click="locatePointByIndex(idx)"
+                style="cursor:pointer;"
+                title="鼠标点击，定位该点位"
+              >
+                {{idx+1}} | {{item.name}} | {{item.type || '未分类'}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}
+              </span>
+              <button
+                class="tool-btn"
+                style="background-color:#0099ff; color:#fff; border:none; border-radius:3px;"
+                @click="locatePointByIndex(idx)"
+              >
+              定位
+              </button>
+              <button
+                class="tool-btn"
+                style="background-color:#ff4444; color:#fff; border:none; border-radius:3px;"
+                @click="removePoint(idx)"
+              >
+              删除
+              </button>
+
             </div>
+          </div>
           </div>
         </dv-border-box-1>
       </div>
@@ -139,6 +159,16 @@
         <div class="form-row">
           <label>归属区域：</label>
           <input v-model="tempPoint.belong" placeholder="请输入归属区域" />
+        </div>
+        <!-- 新增：点位类型 -->
+        <div class="form-row">
+          <label>点位类型：</label>
+          <select v-model="tempPoint.type" class="point-type-select">
+            <option value="">请选择点位类型</option>
+            <option value="直流柜">直流柜</option>
+            <option value="照度器">照度器</option>
+            <option value="路灯">路灯</option>
+          </select>
         </div>
         <div class="form-row">
           <label>点位名称：</label>
@@ -191,13 +221,18 @@ export default {
       showPointDialog: false,
       tempPoint: {
         belong: '',
+        type: '', // 新增
         name: '',
         id: '',
         lng: '',
         lat: '',
         wgsLng: '',
         wgsLat: ''
-      }
+      },
+      dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
+      instance: this.$ajax.create({
+        baseURL: this.$appHost
+      })
     }
   },
   computed: {
@@ -366,7 +401,10 @@ export default {
     },
 
     clearAllManualPoint () {
-      this.manualMarkers.forEach(marker => this.map.remove(marker))
+      this.manualMarkers.forEach(item => {
+        this.map.remove(item.marker)
+        this.map.remove(item.label)
+      })
       this.manualMarkers = []
       this.manualPointList = []
     },
@@ -488,17 +526,41 @@ export default {
       const lng = parseFloat(pointInfo.lng)
       const lat = parseFloat(pointInfo.lat)
 
-      // ✅ 改用高德原生默认Marker，排除SVG图标异常问题
-      const marker = new window.AMap.Marker({
-        position: [lng, lat]
+      // 橙色标记（SVG base64无外网依赖）
+      const orangeDeviceIcon = new window.AMap.Icon({
+        size: new window.AMap.Size(48, 64),
+        image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiNmNzgwMDAiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzIwMDgwMCIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiNmNzgwMDAiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2UtZGFzaGFwPSIyIiBmaWxsPSJub25lIi8+CiAgPHJlY3QgeD0iLTYiIHk9IjM4IiB3aWR0aD0iOCIgaGVpZ2h0PSIxNiIgcng9IjIiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLWRhc2hhcD0iMiIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4=',
+        imageSize: new window.AMap.Size(48, 64)
       })
 
+      // this.marker = new window.AMap.Marker({
+      //   position: [initLng, initLat],
+      //   icon: orangeDeviceIcon
+      // })
+      const marker = new window.AMap.Marker({
+        position: [lng, lat],
+        icon: orangeDeviceIcon
+      })
+      // ====== 点位左上角文字标签======
+      const pointTextLabel = new window.AMap.Text({
+        position: [lng, lat],
+        text: pointInfo.name,
+        offset: new window.AMap.Pixel(-3, -45),
+        style: {
+          color: '#ff7800',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          textShadow: '0 0 3px #000',
+          whiteSpace: 'nowrap'
+        }
+      })
       // 悬浮信息窗口
       const hoverInfoWin = new window.AMap.InfoWindow({
         content: `
           <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
             <div>ID：${pointInfo.id}</div>
             <div>名称：${pointInfo.name}</div>
+            <div>类型：${pointInfo.type || '未分类'}</div>
             <div>归属：${pointInfo.belong}</div>
             <div>GCJ经纬度：${lng},${lat}</div>
             <div>WGS经纬度：${pointInfo.wgsLng},${pointInfo.wgsLat}</div>
@@ -512,16 +574,28 @@ export default {
       marker.on('mouseout', () => {
         hoverInfoWin.close()
       })
+      // 单击橙色图标
       marker.on('click', () => {
         const clickInfoWin = new window.AMap.InfoWindow({
-          content: `归属：${pointInfo.belong}\n名称：${pointInfo.name}\nID：${pointInfo.id}\nGCJ：${lng},${lat}\nWGS：${pointInfo.wgsLng},${pointInfo.wgsLat}`
+          content: `
+            <div style="color:#fff;background:rgba(0,20,40,0.9);padding:10px;border:1px solid #ff7800;border-radius:4px;font-size:13px;line-height:1.7;">
+              归属：${pointInfo.belong}<br/>
+              名称：${pointInfo.name}<br/>
+              ID：${pointInfo.id}<br/>
+              GCJ：${lng},${lat}<br/>
+              WGS：${pointInfo.wgsLng},${pointInfo.wgsLat}
+            </div>
+          `,
+          offset: new window.AMap.Pixel(0, -40),
+          isCustom: true // 关键：关闭高德原生白色外壳
         })
         clickInfoWin.open(this.map, marker.getPosition())
       })
 
       // ✅ 存入数组（确保this指向正确Vue实例）
       this.map.add(marker)
-      this.manualMarkers.push(marker)
+      this.map.add(pointTextLabel)
+      this.manualMarkers.push({marker, label: pointTextLabel})
       this.manualPointList.push({
         ...pointInfo,
         lng: lng,
@@ -534,7 +608,9 @@ export default {
     },
 
     removePoint (index) {
-      this.map.remove(this.manualMarkers[index])
+      const item = this.manualMarkers[index]
+      this.map.remove(item.marker)
+      this.map.remove(item.label)
       this.manualMarkers.splice(index, 1)
       this.manualPointList.splice(index, 1)
     },
@@ -542,9 +618,60 @@ export default {
     saveAllPoints () {
       console.log('待保存点位集合', this.manualPointList)
       alert(`共${this.manualPointList.length}个点位，数据已打印控制台`)
+      // 地图点位，写入数据库
       // axios.post('/api/savePoint', { list: this.manualPointList })
+      // insert into DB
+      if (this.manualPointList.length > 0) {
+        // 循环遍历：拆成单条点位
+        for (const point of this.manualPointList) {
+          // 单条数据结构，匹配pg字段
+          let parentid = '11'
+          const singlePoint = {
+            catalogid: point.id,
+            parentid: parentid,
+            label: point.name,
+            stationtype: 1,
+            commtype: '',
+            protocoltype: point.type,
+            positioninfo: '',
+            addinfo: '',
+            ipaddress: '',
+            ipport: '',
+            childrennum: '',
+            gpslng: point.wgsLng, // WGS原始经度
+            gpslat: point.wgsLat, // WGS原始纬度
+            gcjlng: point.lng, // GCJ高德经度
+            gcjlat: point.lat // GCJ高德纬度
+          }
+          // 提交单条接口
+          this.saveAllPointsToDB(singlePoint)
+        }
+      }
     },
-
+    saveAllPointsToDB (e) {
+      this.instance({
+        url: '/tree/addnode',
+        method: 'post',
+        data: e
+      }).then(res => {
+        if (res.data.code === 1) {
+          // add children node
+          console.log('数据库添加树节点成功', res.data.result)
+          this.$message.success('添加树节点成功')
+          // 清除this.manualPointList
+        } else {
+          console.log('数据库添加树节点失败', res.data.result)
+          this.$message.success('添加树节点失败')
+        }
+      })
+    },
+    // 根据索引定位点位
+    locatePointByIndex (idx) {
+      const point = this.manualPointList[idx]
+      const lng = parseFloat(point.lng)
+      const lat = parseFloat(point.lat)
+      this.map.setZoomAndCenter(16, [lng, lat]) // zoom可按需调整
+    },
     locatePoint () {
       if (this.manualPointList.length === 0) return
       const firstPoint = this.manualPointList[0]
@@ -996,4 +1123,23 @@ export default {
   border: none;
   color: #000;
 }
+/*type-select*/
+.point-type-select {
+  flex: 1;
+  height: 36px;
+  background: #0b2a5a; /* 蓝底，和整体一致 */
+  border: 1px solid #00ffff;
+  color: #fff;
+  padding: 0 10px;
+  font-size: 16px;
+  box-sizing: border-box;
+  /* 可选自定义下拉箭头 */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='cyan' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
 </style>

@@ -392,7 +392,7 @@ export default {
         outswitchstatus: ''
       },
       instance: this.$ajax.create({
-        baseURL: 'http://power.ieyeplus.com:7001/'
+        baseURL: 'http://123.57.87.144:7001/'
       })
     }
   },

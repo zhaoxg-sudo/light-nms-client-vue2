@@ -228,7 +228,11 @@ export default {
         lat: '',
         wgsLng: '',
         wgsLat: ''
-      }
+      },
+      dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
+      instance: this.$ajax.create({
+        baseURL: this.$appHost
+      })
     }
   },
   computed: {
@@ -439,60 +443,18 @@ export default {
           resizeEnable: true
         })
 
-        // 设备绿色标记（SVG base64无外网依赖）
+        // ========== 移除原固定单个DEMO marker代码，改为动态读取数据库点位 ==========
+        // 绿色图标样式保持原样
         const deviceIcon = new window.AMap.Icon({
           size: new window.AMap.Size(48, 64),
           image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
           imageSize: new window.AMap.Size(48, 64)
         })
 
-        this.marker = new window.AMap.Marker({
-          position: [initLng, initLat],
-          icon: deviceIcon
-        })
-        this.map.add(this.marker)
+        // ========== 新增：从数据库加载并渲染全部绿色点位 ==========
+        await this.loadDbGreenPoints(deviceIcon)
 
-        this.textLabel = new window.AMap.Text({
-          position: [initLng, initLat],
-          text: 'DEMO',
-          offset: new window.AMap.Pixel(16, -45),
-          style: {
-            color: '#00ff66',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            textShadow: '0 0 3px #000, 0 0 8px #00ff66, 0 0 12px #00ff66',
-            background: 'transparent',
-            border: 'none',
-            whiteSpace: 'nowrap'
-          }
-        })
-        this.map.add(this.textLabel)
-
-        this.marker.on('moving', (e) => {
-          this.textLabel.setPosition(e.lnglat)
-        })
-        this.marker.on('dblclick', () => {
-          this.openDevicePanel()
-        })
-        // 主设备悬浮弹窗
-        const mainInfoWin = new window.AMap.InfoWindow({
-          content: `
-            <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
-              <div>ID：${this.remoteId || 'DEMO'}</div>
-              <div>名称：DEMO主设备</div>
-            </div>
-          `,
-          offset: new window.AMap.Pixel(0, -55),
-          anchor: 'bottom-center'
-        })
-        this.marker.on('mouseover', () => {
-          mainInfoWin.open(this.map, this.marker.getPosition())
-        })
-        this.marker.on('mouseout', () => {
-          mainInfoWin.close()
-        })
-
-        // 地图单击打开弹窗录入点位信息
+        // 地图单击打开弹窗录入点位信息（原有逻辑完全不变）
         this.map.on('click', (e) => {
           if (!this.drawPointMode) return
           const rawLng = e.lnglat.lng.toFixed(6)
@@ -517,6 +479,83 @@ export default {
       }
     },
 
+    // 新增方法：读取数据库点位渲染绿色marker
+    async loadDbGreenPoints (greenIcon) {
+      try {
+        // 先清理旧数据库点位（需提前在data定义 dbGreenMarkers: []）
+        this.dbGreenMarkers.forEach(item => {
+          this.map.remove(item.marker)
+          this.map.remove(item.label)
+        })
+        this.dbGreenMarkers = []
+
+        // 请求后端读取 power_station_tree
+        const res = await this.instance({'url': '/localall', 'method': 'get'})
+        console.log('【screen】读取的数据库/localall:', res.data)
+        const dbPoints0 = res.data || []
+        // ✅ 筛选 stationtype = '1' 的点位
+        const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
+        console.log('【screen】显示的地图点位:', dbPoints)
+        dbPoints.forEach(row => {
+          const gcjLng = row.gcjlng
+          const gcjLat = row.gcjlat
+          if (!gcjLng || !gcjLat) return
+          const pos = [parseFloat(gcjLng), parseFloat(gcjLat)]
+
+          // 创建Marker
+          const marker = new window.AMap.Marker({
+            position: pos,
+            icon: greenIcon
+          })
+          // 创建文字标签
+          const textLabel = new window.AMap.Text({
+            position: pos,
+            text: row.label || '点位',
+            offset: new window.AMap.Pixel(16, -45),
+            style: {
+              color: '#00ff66',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              textShadow: '0 0 3px #000, 0 0 8px #00ff66, 0 0 12px #00ff66',
+              background: 'transparent',
+              border: 'none',
+              whiteSpace: 'nowrap'
+            }
+          })
+
+          this.map.add(marker)
+          this.map.add(textLabel)
+          this.dbGreenMarkers.push({ marker, label: textLabel })
+
+          // 弹窗信息
+          const mainInfoWin = new window.AMap.InfoWindow({
+            content: `
+              <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
+                <div>ID：${row.catalogid}</div>
+                <div>名称：${row.label || ''}</div>
+                <div>类型：${row.protocoltype || ''}</div>
+                <div>GCJ经纬度：${gcjLng},${gcjLat}</div>
+                <div>WGS经纬度：${row.gpslng || ''},${row.gpslat || ''}</div>
+              </div>
+            `,
+            offset: new window.AMap.Pixel(0, -55),
+            anchor: 'bottom-center',
+            isCustom: true
+          })
+          marker.on('mouseover', () => {
+            mainInfoWin.open(this.map, marker.getPosition())
+          })
+          marker.on('mouseout', () => {
+            mainInfoWin.close()
+          })
+          marker.on('dblclick', () => {
+            this.openDevicePanel()
+          })
+        })
+      } catch (err) {
+        console.error('读取数据库点位异常', err)
+      }
+    },
     addManualMarker (pointInfo) {
       // 转为纯数字坐标
       const lng = parseFloat(pointInfo.lng)
@@ -570,9 +609,20 @@ export default {
       marker.on('mouseout', () => {
         hoverInfoWin.close()
       })
+      // 单击橙色图标
       marker.on('click', () => {
         const clickInfoWin = new window.AMap.InfoWindow({
-          content: `归属：${pointInfo.belong}\n名称：${pointInfo.name}\nID：${pointInfo.id}\nGCJ：${lng},${lat}\nWGS：${pointInfo.wgsLng},${pointInfo.wgsLat}`
+          content: `
+            <div style="color:#fff;background:rgba(0,20,40,0.9);padding:10px;border:1px solid #ff7800;border-radius:4px;font-size:13px;line-height:1.7;">
+              归属：${pointInfo.belong}<br/>
+              名称：${pointInfo.name}<br/>
+              ID：${pointInfo.id}<br/>
+              GCJ：${lng},${lat}<br/>
+              WGS：${pointInfo.wgsLng},${pointInfo.wgsLat}
+            </div>
+          `,
+          offset: new window.AMap.Pixel(0, -40),
+          isCustom: true // 关键：关闭高德原生白色外壳
         })
         clickInfoWin.open(this.map, marker.getPosition())
       })
@@ -603,7 +653,52 @@ export default {
     saveAllPoints () {
       console.log('待保存点位集合', this.manualPointList)
       alert(`共${this.manualPointList.length}个点位，数据已打印控制台`)
+      // 地图点位，写入数据库
       // axios.post('/api/savePoint', { list: this.manualPointList })
+      // insert into DB
+      if (this.manualPointList.length > 0) {
+        // 循环遍历：拆成单条点位
+        for (const point of this.manualPointList) {
+          // 单条数据结构，匹配pg字段
+          let parentid = '11'
+          const singlePoint = {
+            catalogid: point.id,
+            parentid: parentid,
+            label: point.name,
+            stationtype: 1,
+            commtype: '',
+            protocoltype: point.type,
+            positioninfo: '',
+            addinfo: '',
+            ipaddress: '',
+            ipport: '',
+            childrennum: '',
+            gpslng: point.wgsLng, // WGS原始经度
+            gpslat: point.wgsLat, // WGS原始纬度
+            gcjlng: point.lng, // GCJ高德经度
+            gcjlat: point.lat // GCJ高德纬度
+          }
+          // 提交单条接口
+          this.saveAllPointsToDB(singlePoint)
+        }
+      }
+    },
+    saveAllPointsToDB (e) {
+      this.instance({
+        url: '/tree/addnode',
+        method: 'post',
+        data: e
+      }).then(res => {
+        if (res.data.code === 1) {
+          // add children node
+          console.log('数据库添加树节点成功', res.data.result)
+          this.$message.success('添加树节点成功')
+          // 清除this.manualPointList
+        } else {
+          console.log('数据库添加树节点失败', res.data.result)
+          this.$message.success('添加树节点失败')
+        }
+      })
     },
     // 根据索引定位点位
     locatePointByIndex (idx) {
