@@ -83,6 +83,7 @@
               <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
               <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
               <button class="tool-btn" @click="locatePoint">定位点位</button>
+              <button class="tool-btn add-formal-btn" @click="addTempToFormalDB">添加自动发现设备入库</button>
             </div>
             <!-- 手动点位列表悬浮面板 -->
             <div class="map-point-list" v-if="manualPointList.length > 0">
@@ -117,34 +118,37 @@
       </div>
 
       <!-- 右侧设备列表 -->
-      <div class="right-box">
-        <dv-border-box-1 class="panel">
-          <div class="panel-title"> 设备列表 </div>
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Please input"
-          />
-          <table class="device-table">
-            <thead>
-              <tr>
-                <th>序号</th>
-                <th>名字</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr @dblclick="openDevicePanel">
-                <td>1</td>
-                <td>DEMO</td>
-                <td :class="deviceOnline ? 'online' : 'offline'">
-                  {{ deviceOnline ? '在线' : '离线' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </dv-border-box-1>
-      </div>
+    <div class="right-box">
+      <dv-border-box-1 class="panel">
+        <div class="panel-title"> 设备列表 </div>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Please input"
+          v-model="deviceSearch"
+        />
+        <table class="device-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>名字</th>
+              <th>ID</th>
+              <th>类型</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(dev, idx) in dbGreenMarkers" :key="dev.id">
+             <td>{{ idx + 1 }}</td>
+             <td>{{ dev.label }}</td>
+             <td>{{ dev.id }}</td>
+             <td>{{ dev.source }}</td>
+             <td>{{ dev.online ? '在线' : '离线' }}</td>
+           </tr>
+         </tbody>
+        </table>
+      </dv-border-box-1>
+    </div>
     </div>
 
     <DeviceControlPanel
@@ -165,9 +169,9 @@
           <label>点位类型：</label>
           <select v-model="tempPoint.type" class="point-type-select">
             <option value="">请选择点位类型</option>
-            <option value="直流柜">直流柜</option>
-            <option value="照度器">照度器</option>
-            <option value="路灯">路灯</option>
+            <option value="1">直流柜</option>
+            <option value="2">照度器</option>
+            <option value="3">路灯</option>
           </select>
         </div>
         <div class="form-row">
@@ -230,6 +234,9 @@ export default {
         wgsLat: ''
       },
       dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
+      // deviceMarkers: {}, // key: cid/clientKey, value: { marker, label, status }
+      deviceStatusMap: {}, // key: cid/clientKey, value: { online: boolean, lng, lat, name }
+      deviceSearch: '',
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -238,6 +245,29 @@ export default {
   computed: {
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
+    },
+    filterDeviceList () {
+      const list = this.dbGreenMarkers.map(item => ({
+        id: item.id,
+        name: item.name || '未知设备',
+        source: item.source,
+        online: item.online,
+        gcjLng: item.gcjLng,
+        gcjLat: item.gcjLat
+      }))
+      console.log('filterDeviceList原始数据：', list)
+
+      // 搜索框为空时，直接返回完整列表
+      if (!this.deviceSearch.trim()) {
+        return list
+      }
+      const keyword = this.deviceSearch.trim().toLowerCase()
+      return list.filter(d => {
+        // 转为字符串后再调用toLowerCase，防止报错
+        const nameStr = String(d.name).toLowerCase()
+        const idStr = String(d.id).toLowerCase()
+        return nameStr.includes(keyword) || idStr.includes(keyword)
+      })
     }
   },
 
@@ -251,25 +281,126 @@ export default {
       return
     }
 
-    if (this.sockets) {
+    if (this.sockets && !window.globalGpsSubscribed) {
       this.sockets.subscribe('gps', (rawGpsData) => {
         console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
         window.latestGpsData = rawGpsData
-        this.remoteId = rawGpsData.clientKey
-        this.deviceOnline = true
+        const cid = rawGpsData.cid
         this.lastGps = rawGpsData
 
         const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawGpsData.lng, rawGpsData.lat)
-        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+        const point = new window.AMap.LngLat(gcjLng, gcjLat)
 
-        if (this.map && this.marker && this.textLabel) {
-          const point = new window.AMap.LngLat(gcjLng, gcjLat)
-          this.marker.setPosition(point)
-          this.textLabel.setPosition(point)
-          this.map.setCenter(point)
+        // 更新全局状态表
+        this.deviceStatusMap[cid] = {
+          online: true,
+          wgsLng: rawGpsData.lng,
+          wgsLat: rawGpsData.lat,
+          gcjLng: gcjLng,
+          gcjLat: gcjLat,
+          name: rawGpsData.name || cid,
+          updateTime: new Date()
+        }
+
+        // 实时弹窗模板
+        const getGpsInfoContent = (cid, rawGpsData, gcjLng, gcjLat) => `
+          <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
+            <div>ID：${cid}</div>
+            <div>名称：${rawGpsData.name || cid}</div>
+            <div>类型：实时GPS设备</div>
+            <div>GCJ经纬度：${gcjLng},${gcjLat}</div>
+            <div>WGS经纬度：${rawGpsData.lng},${rawGpsData.lat}</div>
+            <div>GPS更新时间：${new Date().toLocaleString()}</div>
+          </div>
+        `
+
+        // 在统一主数组 dbGreenMarkers 查找点位
+        let dbItem = this.dbGreenMarkers.find(item => item.id === cid)
+        // 临时新增设备图标（橙色）
+        const tempDeviceIcon = new window.AMap.Icon({
+          size: new window.AMap.Size(48, 64),
+          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiNmNzgwMDAiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzIwMDgwMCIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiNmNzgwMDAiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+          imageSize: new window.AMap.Size(48, 64)
+        })
+        if (dbItem) {
+          // ✅ 更新已有点位
+          dbItem.marker.setPosition(point)
+          dbItem.label.setPosition(point)
+          dbItem.gcjLng = gcjLng
+          dbItem.gcjLat = gcjLat
+          dbItem.wgsLng = rawGpsData.lng
+          dbItem.wgsLat = rawGpsData.lat
+          dbItem.online = true
+
+          // ✅ 实时更新弹窗内容和位置
+          if (dbItem.infoWin) {
+            const newContent = getGpsInfoContent(cid, rawGpsData, gcjLng, gcjLat)
+            dbItem.infoWin.setContent(newContent)
+            dbItem.infoWin.setPosition(point)
+          }
+        } else {
+          // ✅ 首次新建GPS点位 + mainInfoWin
+          const marker = new window.AMap.Marker({
+            position: point,
+            icon: tempDeviceIcon
+          })
+          const textLabel = new window.AMap.Text({
+            position: point,
+            text: rawGpsData.name || cid,
+            offset: new window.AMap.Pixel(16, -45),
+            style: {
+              color: '#ff7800', // 橙色文字
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textShadow: '0 0 3px #000, 0 0 8px #00ff66',
+              background: 'transparent',
+              border: 'none',
+              whiteSpace: 'nowrap'
+            }
+          })
+          // GPS点位弹窗（和数据库样式完全一致）
+          const mainInfoWin = new window.AMap.InfoWindow({
+            content: getGpsInfoContent(cid, rawGpsData, gcjLng, gcjLat),
+            offset: new window.AMap.Pixel(0, -55),
+            anchor: 'bottom-center',
+            isCustom: true
+          })
+          marker.on('mouseover', () => {
+            mainInfoWin.open(this.map, marker.getPosition())
+          })
+          marker.on('mouseout', () => {
+            mainInfoWin.close()
+          })
+
+          this.map.add(marker)
+          this.map.add(textLabel)
+
+          // ✅ 存入主数组 dbGreenMarkers
+          this.dbGreenMarkers.push({
+            id: cid,
+            source: 'gps-temp',
+            marker,
+            label: textLabel,
+            infoWin: mainInfoWin,
+            gcjLng,
+            gcjLat,
+            wgsLng: rawGpsData.lng,
+            wgsLat: rawGpsData.lat,
+            name: rawGpsData.name || cid,
+            online: true
+          })
+          // 状态记录
+          this.deviceStatusMap[cid] = {
+            online: true,
+            wgsLng: rawGpsData.lng,
+            wgsLat: rawGpsData.lat,
+            gcjLng: gcjLng,
+            gcjLat: gcjLat,
+            name: rawGpsData.name || cid,
+            updateTime: new Date()
+          }
         }
       })
-
       window.globalGpsSubscribed = true
     }
   },
@@ -482,32 +613,30 @@ export default {
     // 新增方法：读取数据库点位渲染绿色marker
     async loadDbGreenPoints (greenIcon) {
       try {
-        // 先清理旧数据库点位（需提前在data定义 dbGreenMarkers: []）
+        // 清空旧dbGreenMarkers并销毁marker
         this.dbGreenMarkers.forEach(item => {
           this.map.remove(item.marker)
           this.map.remove(item.label)
         })
         this.dbGreenMarkers = []
 
-        // 请求后端读取 power_station_tree
         const res = await this.instance({'url': '/localall', 'method': 'get'})
         console.log('【screen】读取的数据库/localall:', res.data)
         const dbPoints0 = res.data || []
-        // ✅ 筛选 stationtype = '1' 的点位
         const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
-        console.log('【screen】显示的地图点位:', dbPoints)
+        console.log('【screen】显示的数据库点位:', dbPoints)
+
         dbPoints.forEach(row => {
           const gcjLng = row.gcjlng
           const gcjLat = row.gcjlat
           if (!gcjLng || !gcjLat) return
           const pos = [parseFloat(gcjLng), parseFloat(gcjLat)]
+          const id = row.catalogid
 
-          // 创建Marker
           const marker = new window.AMap.Marker({
             position: pos,
             icon: greenIcon
           })
-          // 创建文字标签
           const textLabel = new window.AMap.Text({
             position: pos,
             text: row.label || '点位',
@@ -523,11 +652,7 @@ export default {
             }
           })
 
-          this.map.add(marker)
-          this.map.add(textLabel)
-          this.dbGreenMarkers.push({ marker, label: textLabel })
-
-          // 弹窗信息
+          // 弹窗
           const mainInfoWin = new window.AMap.InfoWindow({
             content: `
               <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
@@ -542,6 +667,7 @@ export default {
             anchor: 'bottom-center',
             isCustom: true
           })
+
           marker.on('mouseover', () => {
             mainInfoWin.open(this.map, marker.getPosition())
           })
@@ -551,6 +677,35 @@ export default {
           marker.on('dblclick', () => {
             this.openDevicePanel()
           })
+
+          this.map.add(marker)
+          this.map.add(textLabel)
+
+          // 存入统一主数组 dbGreenMarkers
+          this.dbGreenMarkers.push({
+            id: id,
+            source: 'db', // 标记来源：数据库
+            marker,
+            label: textLabel,
+            infoWin: mainInfoWin,
+            gcjLng,
+            gcjLat,
+            wgsLng: row.gpslng,
+            wgsLat: row.gpslat,
+            name: row.label,
+            online: false
+          })
+          console.log('【screen】显示的dbGreenMarkers:', this.dbGreenMarkers)
+          // 更新设备状态表
+          this.deviceStatusMap[id] = {
+            online: false,
+            gcjLng,
+            gcjLat,
+            wgsLng: row.gpslng,
+            wgsLat: row.gpslat,
+            name: row.label,
+            updateTime: new Date()
+          }
         })
       } catch (err) {
         console.error('读取数据库点位异常', err)
@@ -713,7 +868,15 @@ export default {
       this.map.setCenter([firstPoint.lng, firstPoint.lat])
       this.map.setZoom(14)
     },
-
+    // 聚焦
+    focusDevice (deviceId) {
+      const target = this.dbGreenMarkers.find(item => item.id === deviceId)
+      if (!target || !target.gcjLng || !target.gcjLat) return
+      const lng = parseFloat(target.gcjLng)
+      const lat = parseFloat(target.gcjLat)
+      this.map.setZoomAndCenter(16, [lng, lat])
+      this.remoteId = deviceId
+    },
     gcj02ToWgs84 (gcjLon, gcjLat) {
       const PI = 3.1415926535897932384626
       const a = 6378245.0
@@ -1176,5 +1339,17 @@ export default {
   background-position: right 10px center;
   padding-right: 30px;
 }
-
+/* 设备列表 */
+.offline {
+  color: #ff2a2a;
+  font-weight: bold;
+}
+.online {
+  color: #00ff66;
+  font-weight: bold;
+}
+.temp-tag {
+  color: #ff7800;
+  font-weight: bold;
+}
 </style>

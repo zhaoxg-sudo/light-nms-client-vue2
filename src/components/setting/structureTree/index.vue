@@ -87,6 +87,7 @@ export default {
     refresh () {
       this.$ajax.get(this.$appHost + '/localall')
         .then((res) => {
+          console.log('从数据库读取的catalog数据=', res.data)
           this.treeData = this.actionGetCatalog(res.data)
           let data = this.treeData
           // let data = res.data.result
@@ -94,7 +95,6 @@ export default {
           console.log(data[0]['label'])
           // 初始化树对象
           this.TreeChange({data: data[0], node: {}})
-            .then((res) => { console.log(res) })
           // 循环出默认展开项的ID
           for (let i in data) {
             this.defaultExpanded.push(data[i]['label'])

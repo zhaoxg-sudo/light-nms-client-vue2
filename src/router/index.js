@@ -20,7 +20,14 @@ import dataConfig from '@/components/setting/dataManage/index'
 import login from '@/components/login/index'
 import store from '@/store/index'
 // import { settings } from 'nprogress'
-
+// 导入全部结束后，再写路由重写逻辑（解决 import/first 报错）
+const originalPush = Router.prototype.push
+// 修复空格规范：function push ( 括号前加空格
+Router.prototype.push = function push (location) {
+  return originalPush.call(this, location).catch(err => {
+    if (err.name !== 'NavigationDuplicated') throw err
+  })
+}
 Vue.use(Router)
 
 const router = new Router({
