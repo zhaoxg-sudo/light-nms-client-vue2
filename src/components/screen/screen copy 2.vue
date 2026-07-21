@@ -116,44 +116,36 @@
         </dv-border-box-1>
       </div>
 
+      <!-- 右侧设备列表 -->
       <div class="right-box">
         <dv-border-box-1 class="panel">
-          <div class="panel-title">设备列表</div>
+          <div class="panel-title"> 设备列表 </div>
           <input
             type="text"
             class="search-input"
-            placeholder="搜索名称/ID"
-            v-model="deviceSearch"
+            placeholder="Please input"
           />
           <table class="device-table">
             <thead>
               <tr>
                 <th>序号</th>
-                <th>点位名称</th>
-                <th>点位ID</th>
+                <th>名字</th>
                 <th>状态</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="(item, idx) in tableList"
-                :key="item.id"
-                @dblclick="handleDblClickRow(item.id)"
-              >
-                <td>{{ idx + 1 }}</td>
-                <td>{{ item.name || "未命名" }}</td>
-                <td>{{ item.id }}</td>
-                <td :class="item.online ? 'online' : 'offline'">
-                  {{ item.online ? "在线" : "离线" }}
+              <tr @dblclick="openDevicePanel">
+                <td>1</td>
+                <td>DEMO</td>
+                <td :class="deviceOnline ? 'online' : 'offline'">
+                  {{ deviceOnline ? '在线' : '离线' }}
                 </td>
-              </tr>
-              <tr v-if="tableList.length === 0">
-                <td colspan="4">暂无点位数据</td>
               </tr>
             </tbody>
           </table>
         </dv-border-box-1>
       </div>
+    </div>
 
     <DeviceControlPanel
       :visible.sync="showDevicePanel"
@@ -238,7 +230,6 @@ export default {
         wgsLat: ''
       },
       dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
-      deviceSearch: '',
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -247,16 +238,6 @@ export default {
   computed: {
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
-    },
-    tableList () {
-      const keyword = this.deviceSearch.trim().toLowerCase()
-      // 直接从数据库点位数组映射表格数据
-      return this.dbGreenMarkers.filter((row) => {
-        const name = String(row.name || '').toLowerCase()
-        const id = String(row.id || '').toLowerCase()
-        if (!keyword) return true
-        return name.includes(keyword) || id.includes(keyword)
-      })
     }
   },
 
@@ -280,18 +261,6 @@ export default {
 
         const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawGpsData.lng, rawGpsData.lat)
         console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
-
-        // 匹配数据库点位 更新在线状态与坐标
-        const targetPoint = this.dbGreenMarkers.find(item => item.id === rawGpsData.cid)
-        if (targetPoint) {
-          console.log('🔥 实时收到原始GPS(WGS84),匹配到数据库点位', rawGpsData)
-          targetPoint.online = true
-          // ========= 新增：在线切换绿色图标 =========
-          targetPoint.marker.setIcon(targetPoint.greenIcon)
-          // const pos = new window.AMap.LngLat(gcjLng, gcjLat)
-          // targetPoint.marker.setPosition(pos)
-          // targetPoint.label.setPosition(pos)
-        }
 
         if (this.map && this.marker && this.textLabel) {
           const point = new window.AMap.LngLat(gcjLng, gcjLat)
@@ -513,13 +482,6 @@ export default {
     // 新增方法：读取数据库点位渲染绿色marker
     async loadDbGreenPoints (greenIcon) {
       try {
-        // ========= 新增：离线灰色图标定义 =========
-        const grayIcon = new window.AMap.Icon({
-          size: new window.AMap.Size(48, 64),
-          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiM5OTk5OTkiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzFiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiM5OTk5OTkiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzY2NjY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
-          imageSize: new window.AMap.Size(48, 64)
-        })
-
         // 先清理旧数据库点位（需提前在data定义 dbGreenMarkers: []）
         this.dbGreenMarkers.forEach(item => {
           this.map.remove(item.marker)
@@ -543,7 +505,7 @@ export default {
           // 创建Marker
           const marker = new window.AMap.Marker({
             position: pos,
-            icon: grayIcon
+            icon: greenIcon
           })
           // 创建文字标签
           const textLabel = new window.AMap.Text({
@@ -560,6 +522,11 @@ export default {
               whiteSpace: 'nowrap'
             }
           })
+
+          this.map.add(marker)
+          this.map.add(textLabel)
+          this.dbGreenMarkers.push({ marker, label: textLabel })
+
           // 弹窗信息
           const mainInfoWin = new window.AMap.InfoWindow({
             content: `
@@ -575,23 +542,6 @@ export default {
             anchor: 'bottom-center',
             isCustom: true
           })
-
-          this.map.add(marker)
-          this.map.add(textLabel)
-          // this.dbGreenMarkers.push({ marker, label: textLabel })
-          // 存入数组，提供给右侧表格使用
-          this.dbGreenMarkers.push({
-            id: row.catalogid,
-            name: row.label,
-            gcjLng,
-            gcjLat,
-            marker,
-            label: textLabel,
-            mainInfoWin,
-            online: false, // 默认离线，GPS收到数据更新为true
-            greenIcon,
-            grayIcon
-          })
           marker.on('mouseover', () => {
             mainInfoWin.open(this.map, marker.getPosition())
           })
@@ -599,12 +549,6 @@ export default {
             mainInfoWin.close()
           })
           marker.on('dblclick', () => {
-            const target = this.dbGreenMarkers.find(item => item.id === row.catalogid)
-            if (!target || !target.online) {
-              alert('设备离线，无法打开面板')
-              return
-            }
-            this.remoteId = row.catalogid
             this.openDevicePanel()
           })
         })
@@ -769,16 +713,7 @@ export default {
       this.map.setCenter([firstPoint.lng, firstPoint.lat])
       this.map.setZoom(14)
     },
-    // 双击表格行定位地图
-    handleDblClickRow (deviceId) {
-      const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
-      if (!target) return alert('未找到该点位')
-      const lng = Number(target.gcjLng)
-      const lat = Number(target.gcjLat)
-      if (isNaN(lng) || isNaN(lat)) return alert('坐标无效')
-      this.map.setZoomAndCenter(16, [lng, lat])
-      this.remoteId = deviceId
-    },
+
     gcj02ToWgs84 (gcjLon, gcjLat) {
       const PI = 3.1415926535897932384626
       const a = 6378245.0

@@ -25,5 +25,7 @@ module.exports = {
     'generator-star-spacing': 'off',
     // allow debugger during development
     'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
+    // 关闭导致编译崩溃的内部BUG规则
+    "node/process-exit-as-throw": "off"
   }
 }

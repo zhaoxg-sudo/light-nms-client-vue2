@@ -5,7 +5,7 @@
         <span>Hi {{username}}<a @click="logout()"> [退出]</a>
           <a v-if="showSetting" @click="setting()"><i class="fa fa-cogs"></i>配置管理</a>
           <a @click="$router.go(0)"><i class="fa fa-refresh"></i>刷新页面</a>
-          &nbsp;  &nbsp;&nbsp;  &nbsp;&nbsp; v0.1.1 2026.0715
+          &nbsp;  &nbsp;&nbsp;  &nbsp;&nbsp; v0.1.2 2026.0721
         </span>
       </div>
     </div>
