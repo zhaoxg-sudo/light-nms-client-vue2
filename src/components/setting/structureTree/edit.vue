@@ -51,7 +51,7 @@
              </el-form-item>
             </div>
           </div> -->
-          <div class="col-md-6" v-if="upData.stationtype!=0" prop="ipAddress">
+          <!-- <div class="col-md-6" v-if="upData.stationtype!=0" prop="ipAddress">
             <div class="form-group">
               <label class="col-sm-6 control-label">IP地址</label>
               <div class="col-sm-6">
@@ -64,6 +64,22 @@
               <label class="col-sm-6 control-label">IP端口</label>
               <div class="col-sm-6">
                 <input type="text" class="form-control" v-model="upData.ipport" style="width:130px;">
+              </div>
+            </div>
+          </div> -->
+           <div class="col-md-6" v-if="upData.stationtype!=0">
+            <div class="form-group">
+              <label class="col-sm-6 control-label">经度</label>
+              <div class="col-sm-6">
+                <input type="text" class="form-control" v-model="upData.gpslng" style="width:130px;">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6" v-if="upData.stationtype!=0">
+            <div class="form-group">
+              <label class="col-sm-6 control-label">维度</label>
+              <div class="col-sm-6">
+                <input type="text" class="form-control" v-model="upData.gpslat" style="width:130px;">
               </div>
             </div>
           </div>
@@ -112,7 +128,9 @@ export default {
         addinfo: '',
         ipaddress: '',
         ipport: '',
-        childrennum: ''
+        childrennum: '',
+        gpslng: '',
+        gpslat: ''
       },
       returnData: {node: null, data: null, addNodeData: null},
       rules: {

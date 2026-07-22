@@ -71,6 +71,13 @@
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
           <div id="container" class="map-box">
+            <!-- 【新增：右上角地图定位按钮，独立于工具栏，无权限限制】 -->
+            <div style="position:absolute;top:12px;right:12px;z-index:1000;">
+              <button class="map-locate-btn" @click="goDefaultCenter" title="定位到地图中心点">
+                <img style="width:26px;height:22px;margin-right:4px;vertical-align:middle;"
+                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE4Ij48cGF0aCBkPSJNOCAxQzEyIDQgMTYgOSA4IDE3IDAgOSA0IDQgOCAxWiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSI4IiBjeT0iMTAiIHI9IjIiIGZpbGw9IiMwMDc2ZmYiLz48L3N2Zz4=">
+              </button>
+            </div>
             <!-- 地图点位工具栏 仅编辑权限用户显示 -->
             <div class="map-tool-bar" v-if="hasPointEditPerm">
               <button
@@ -83,11 +90,26 @@
               <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
               <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
               <button class="tool-btn" @click="locatePoint">定位点位</button>
+              <!-- <button class="tool-btn" @click="goDefaultCenter">地图中心点</button> -->
+              <!-- <div style="position:absolute;top:12px;right:12px;z-index:999;">
+                <button
+                  style="width:44px;height:44px;border:none;border-radius:6px;background:#fff;box-shadow:0 2px 8px #0003;cursor:pointer;padding:6px;"
+                  @click="goDefaultCenter"
+                  title="回到地图默认中心点"
+                >
+                  <img
+                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ0IDQ4Ij48cGF0aCBkPSJNMjIgMiBDMzIgMTIgNDAgMjcgMjIgNDYgNCAyNyAxMiAxMiAyMiAyWiIgZmlsbD0iIzAwNzZmZiIvPjxjaXJjbGUgY3g9IjIyIiBjeT0iMjgiIHI9IjYiIGZpbGw9IndoaXRlIi8+PC9zdmc+"
+                    style="width:100%;height:100%;object-fit:contain;"
+                  />
+                </button>
+              </div> -->
+
+              <!-- <button class="tool-btn" @click="destroyCenterMarker">清空中心点标记</button> -->
             </div>
             <!-- 手动点位列表悬浮面板 -->
             <div class="map-point-list" v-if="manualPointList.length > 0">
-            <div class="list-title">已添加点位({{manualPointList.length}})</div>
-            <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
+              <div class="list-title">已添加点位({{manualPointList.length}})</div>
+              <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
               <span
                 @click="locatePointByIndex(idx)"
                 style="cursor:pointer;"
@@ -109,9 +131,8 @@
               >
               删除
               </button>
-
-            </div>
-          </div>
+             </div>
+           </div>
           </div>
         </dv-border-box-1>
       </div>
@@ -201,6 +222,8 @@ import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
 import DeviceControlPanel from './devicepanel.vue'
 import { getHeight } from '@/utils/height.js'
+import { mapGetters } from 'vuex'
+import {GET_USER_INFO} from '@/store/getters/type'
 
 export default {
   name: 'Screen',
@@ -224,7 +247,8 @@ export default {
       manualPointList: [],
       manualMarkers: [],
       drawPointMode: false,
-      userPermissions: ['point:edit', 'device:read'],
+      // userPermissions: ['point:edit', 'device:read'],
+      userPermissions: [],
       // 新增点位弹窗数据
       showPointDialog: false,
       tempPoint: {
@@ -239,12 +263,20 @@ export default {
       },
       dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
       deviceSearch: '',
+      centerMarker: null, // 地图中心点临时标记
+      centerLabel: null, // 中心点文字标签
+      defaultLng: 116.331644,
+      defaultLat: 40.043262,
+      loginusertype: '',
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
     }
   },
   computed: {
+    ...mapGetters({
+      get_user_info: GET_USER_INFO
+    }),
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
     },
@@ -266,6 +298,13 @@ export default {
       getHeight()
       this.getHeightsWidths()
     })
+    this.loginusertype = this.get_user_info.user.usertype
+    console.log('当前登录的用户类型', this.get_user_info.user.username, this.loginusertype)
+    if (this.loginusertype <= 0) {
+      this.userPermissions.push('point:edit')
+    } else {
+      this.userPermissions.push('device:read')
+    }
     if (window.globalGpsSubscribed) {
       return
     }
@@ -288,9 +327,15 @@ export default {
           targetPoint.online = true
           // ========= 新增：在线切换绿色图标 =========
           targetPoint.marker.setIcon(targetPoint.greenIcon)
-          // const pos = new window.AMap.LngLat(gcjLng, gcjLat)
-          // targetPoint.marker.setPosition(pos)
-          // targetPoint.label.setPosition(pos)
+          // 构建实时坐标对象
+          const realTimePos = new window.AMap.LngLat(gcjLng, gcjLat)
+          // 更新Marker实时位置（核心：跟随GPS移动）
+          targetPoint.marker.setPosition(realTimePos)
+          // 同步更新文字标签位置
+          targetPoint.label.setPosition(realTimePos)
+          // 同步更新点位存储的坐标，持久化最新位置
+          targetPoint.gcjLng = gcjLng
+          targetPoint.gcjLat = gcjLat
         }
 
         if (this.map && this.marker && this.textLabel) {
@@ -344,6 +389,7 @@ export default {
 
   beforeDestroy () {
     clearInterval(this.timer)
+    this.destroyCenterMarker() // 销毁中心点标记
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
     if (document.fullscreenElement) {
@@ -484,6 +530,10 @@ export default {
 
         // ========== 新增：从数据库加载并渲染全部绿色点位 ==========
         await this.loadDbGreenPoints(deviceIcon)
+        // 地图初始化默认中心点（项目初始坐标）
+        const defaultLng = this.defaultLng
+        const defaultLat = this.defaultLat
+        this.createCenterMarker(defaultLng, defaultLat, '地图中心')
 
         // 地图单击打开弹窗录入点位信息（原有逻辑完全不变）
         this.map.on('click', (e) => {
@@ -535,9 +585,19 @@ export default {
         const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
         console.log('【screen】显示的地图点位:', dbPoints)
         dbPoints.forEach(row => {
-          const gcjLng = row.gcjlng
-          const gcjLat = row.gcjlat
-          if (!gcjLng || !gcjLat) return
+          let gcjLng = row.gcjlng
+          let gcjLat = row.gcjlat
+          let gpsLng
+          let gpsLat
+          if (!gcjLng || !gcjLat) {
+            gpsLng = Number(row.gpslng)
+            gpsLat = Number(row.gpslat)
+            if (!gpsLng || !gpsLat) return
+            const [gcjL, gcjLa] = this.wgs84ToGcj02(gpsLng, gpsLat)
+            gcjLng = gcjL
+            gcjLat = gcjLa
+            console.log('【screen】配置了GPS,无高德点位数据:', gcjLng, gcjLat)
+          }
           const pos = [parseFloat(gcjLng), parseFloat(gcjLat)]
 
           // 创建Marker
@@ -773,9 +833,13 @@ export default {
     handleDblClickRow (deviceId) {
       const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
       if (!target) return alert('未找到该点位')
+      console.log('[screen]双击的点位信息', target)
       const lng = Number(target.gcjLng)
       const lat = Number(target.gcjLat)
-      if (isNaN(lng) || isNaN(lat)) return alert('坐标无效')
+      console.log('[screen]双击的点位信息lng=,lat=', lng, lat)
+      if (isNaN(lng) || isNaN(lat)) {
+        return alert('坐标无效')
+      }
       this.map.setZoomAndCenter(16, [lng, lat])
       this.remoteId = deviceId
     },
@@ -812,6 +876,71 @@ export default {
       const wgsLat = gcjLat - dLat
       const wgsLon = gcjLon - dLon
       return [wgsLon, wgsLat]
+    },
+    goDefaultCenter () {
+      const lng = this.defaultLng
+      const lat = this.defaultLat
+      this.map.setZoomAndCenter(12, [lng, lat])
+      this.createCenterMarker(lng, lat, '地图中心')
+    },
+
+    // 创建地图中心点临时标记
+    createCenterMarker (lng, lat, name) {
+      this.destroyCenterMarker()
+      const pos = new window.AMap.LngLat(lng, lat)
+      // 水滴中心点图标
+      const dropIcon = new window.AMap.Icon({
+        size: new window.AMap.Size(44, 48),
+        image: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ0IDQ4Ij48cGF0aCBkPSJNMjIgMiBDMzIgMTIgNDAgMjcgMjIgNDYgNCAyNyAxMiAxMiAyMiAyWiIgZmlsbD0iIzAwNzZmZiIvPjxjaXJjbGUgY3g9IjIyIiBjeT0iMjgiIHI9IjYiIGZpbGw9IndoaXRlIi8+PC9zdmc+',
+        imageSize: new window.AMap.Size(44, 48)
+      })
+
+      this.centerMarker = new window.AMap.Marker({
+        position: pos,
+        icon: dropIcon,
+        zIndex: 999,
+        title: '地图中心点' // ✅ 鼠标悬浮内置tooltip
+      })
+      // this.centerLabel = new window.AMap.Text({
+      //   position: pos,
+      //   text: name,
+      //   offset: new window.AMap.Pixel(0, -60),
+      //   style: {
+      //     color: '#ffffff', // 纯白色文字，对比度拉满
+      //     fontSize: '16px', // 字号放大2px
+      //     fontWeight: 'bold', // 加粗更清晰
+      //     background: 'rgba(0,0,0,0.85)', // 加深黑色背景，遮挡地图底色
+      //     padding: '3px 8px', // 增加内边距，文字不贴边框
+      //     borderRadius: '4px',
+      //     whiteSpace: 'nowrap',
+      //     textShadow: '0 0 4px #000' // 文字描边防融合
+      //   }
+      // })
+      this.centerLabel = null
+      this.map.add(this.centerMarker)
+      // this.map.add(this.centerLabel)
+    },
+
+    // 销毁中心点标记
+    destroyCenterMarker () {
+      if (this.centerMarker) {
+        this.map.remove(this.centerMarker)
+        this.centerMarker = null
+      }
+      if (this.centerLabel) {
+        this.map.remove(this.centerLabel)
+        this.centerLabel = null
+      }
+    },
+
+    // 定位到中心点（按钮调用）
+    locateCenterMarker () {
+      if (!this.centerMarker) {
+        alert('暂无实时定位标记')
+        return
+      }
+      const pos = this.centerMarker.getPosition()
+      this.map.setZoomAndCenter(16, [pos.lng, pos.lat])
     },
 
     getHeightsWidths () {
@@ -1241,5 +1370,21 @@ export default {
   background-position: right 10px center;
   padding-right: 30px;
 }
-
+/* 地图中心点 */
+.map-locate-btn {
+  height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 4px;
+  background: #0a78ff;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  display:inline-flex;
+  align-items:center;
+}
+.map-locate-btn:hover {
+  background: #0866dd;
+}
 </style>
