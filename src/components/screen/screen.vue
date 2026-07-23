@@ -232,6 +232,13 @@
       </div>
     </div>
   </div>
+  <!-- 全局提示弹窗 替代alert -->
+  <div class="tip-mask" v-if="showTipModal" @click="showTipModal = false">
+    <div class="tip-box">
+      <p>{{ tipText }}</p>
+      <button class="tip-btn">确定</button>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -289,6 +296,9 @@ export default {
       defaultLng: 116.331644,
       defaultLat: 40.043262,
       loginusertype: '',
+      // 自定义弹窗
+      showTipModal: false,
+      tipText: '',
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -439,6 +449,11 @@ export default {
     refreshAll () {
       window.location.reload()
     },
+    // 自定义提示弹窗，替代原生alert
+    showTip (msg) {
+      this.tipText = msg
+      this.showTipModal = true
+    },
     wgs84ToGcj02 (wgsLon, wgsLat) {
       const PI = 3.1415926535897932384626
       const a = 6378245.0
@@ -488,7 +503,8 @@ export default {
         this.remoteId = id
         this.showDevicePanel = true
       } else {
-        alert('该设备当前离线，无法打开设备控制面板！')
+        // alert('该设备当前离线，无法打开设备控制面板！')
+        this.showTip('该设备当前离线，无法打开设备控制面板！')
       }
     },
     toggleFullScreen (e) {
@@ -1499,4 +1515,38 @@ export default {
 .map-top-btn:hover {
   background-color: #0767dd;
 }
+/* 自定义弹窗样式*/
+.tip-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tip-box {
+  background: #0b1229;
+  border: 1px solid #00ffff;
+  padding: 20px 26px;
+  border-radius: 6px;
+  color: #fff;
+  text-align: center;
+}
+.tip-box p {
+  margin: 0 0 16px;
+  line-height: 1.7;
+}
+.tip-btn {
+  padding: 5px 18px;
+  background: #0a78ff;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
 </style>
