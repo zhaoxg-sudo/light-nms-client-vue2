@@ -174,8 +174,10 @@
               <tr
                 v-for="(item, idx) in tableList"
                 :key="item.id"
-                @dblclick="handleDblClickRow(item.id)"
+                @click="handleClickRow(item.id)"
+                @dblclick="openDevicePanel(item.id)"
               >
+
                 <td>{{ idx + 1 }}</td>
                 <td>{{ item.name || "未命名" }}</td>
                 <td>{{ item.id }}</td>
@@ -899,19 +901,17 @@ export default {
       this.map.setCenter([firstPoint.lng, firstPoint.lat])
       this.map.setZoom(14)
     },
-    // 双击表格行定位地图
-    handleDblClickRow (deviceId) {
+    // 单击表格行：地图居中定位点位
+    handleClickRow (deviceId) {
       const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
       if (!target) return alert('未找到该点位')
-      console.log('[screen]双击的点位信息', target)
       const lng = Number(target.gcjLng)
       const lat = Number(target.gcjLat)
-      console.log('[screen]双击的点位信息lng=,lat=', lng, lat)
       if (isNaN(lng) || isNaN(lat)) {
         return alert('坐标无效')
       }
+      // 地图缩放+居中到当前点位
       this.map.setZoomAndCenter(16, [lng, lat])
-      this.remoteId = deviceId
     },
     // 定位地图center by id
     locatePointByID (deviceId) {
