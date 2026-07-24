@@ -754,31 +754,6 @@ export default {
             grayIcon
           })
 
-          // // 鼠标移入点位：清除关闭倒计时，打开弹窗
-          // marker.on('mouseover', () => {
-          //   clearTimeout(globalHoverTimer)
-          //   mainInfoWin.open(this.map, marker.getPosition())
-          // })
-
-          // // 鼠标移出点位：500毫秒延时关闭弹窗，预留移动鼠标缓冲时间
-          // marker.on('mouseout', () => {
-          //   globalHoverTimer = setTimeout(() => {
-          //     mainInfoWin.close()
-          //   }, 500)
-          // })
-
-          // // 弹窗打开后，绑定弹窗内部鼠标移入移出事件（核心解决按钮点击失效）
-          // mainInfoWin.on('open', () => {
-          //   const winDom = mainInfoWin.getContentDom()
-          //   // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
-          //   winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
-          //   // 鼠标离开弹窗：重新开启延时关闭
-          //   winDom.onmouseleave = () => {
-          //     globalHoverTimer = setTimeout(() => {
-          //       mainInfoWin.close()
-          //     }, 500)
-          //   }
-          // })
           // 鼠标移入点位：清除关闭倒计时，打开弹窗
           marker.on('mouseover', () => {
             clearTimeout(globalHoverTimer)
@@ -792,24 +767,19 @@ export default {
             }, 500)
           })
 
-          // 弹窗打开后，绑定弹窗内部鼠标移入移出事件
+          // 弹窗打开后，绑定弹窗内部鼠标移入移出事件（核心解决按钮点击失效）
           mainInfoWin.on('open', () => {
-            // 延时150ms 等待弹窗内部DOM完整渲染完毕
-            setTimeout(() => {
-              const winDom = mainInfoWin.getContentDom()
-              // 必须做空值判断
-              if (!winDom) return
-
-              // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
-              winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
-              // 鼠标离开弹窗：重新开启延时关闭
-              winDom.onmouseleave = () => {
-                globalHoverTimer = setTimeout(() => {
-                  mainInfoWin.close()
-                }, 500)
-              }
-            }, 150)
+            const winDom = mainInfoWin.getContentDom()
+            // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
+            winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
+            // 鼠标离开弹窗：重新开启延时关闭
+            winDom.onmouseleave = () => {
+              globalHoverTimer = setTimeout(() => {
+                mainInfoWin.close()
+              }, 500)
+            }
           })
+
           // 双击点位打开设备面板（离线设备禁止打开）
           marker.on('dblclick', () => {
             const target = this.dbGreenMarkers.find(item => item.id === row.catalogid)

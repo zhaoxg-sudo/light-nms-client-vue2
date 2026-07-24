@@ -17,5 +17,7 @@ export default {
   updateTime: 5000,
   TreeData: {},
   // 点击树菜单的 obj
-  TreeObj: {}
+  TreeObj: {},
+  // 联动map set center
+  treeClickState: {}
 }
