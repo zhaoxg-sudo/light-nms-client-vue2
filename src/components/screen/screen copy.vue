@@ -479,83 +479,66 @@ export default {
       }
     },
 
-    // 新增方法：读取数据库点位渲染绿色marker
-    async loadDbGreenPoints (greenIcon) {
-      try {
-        // 先清理旧数据库点位（需提前在data定义 dbGreenMarkers: []）
-        this.dbGreenMarkers.forEach(item => {
-          this.map.remove(item.marker)
-          this.map.remove(item.label)
-        })
-        this.dbGreenMarkers = []
+    if (this.sockets) {
+      this.sockets.subscribe('gps', (rawGpsData) => {
+        console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
+        window.latestGpsData = rawGpsData
+        this.remoteId = rawGpsData.clientKey
+        this.deviceOnline = true
+        this.lastGps = rawGpsData
 
-        // 请求后端读取 power_station_tree
-        const res = await this.instance({'url': '/localall', 'method': 'get'})
-        console.log('【screen】读取的数据库/localall:', res.data)
-        const dbPoints0 = res.data || []
-        // ✅ 筛选 stationtype = '1' 的点位
-        const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
-        console.log('【screen】显示的地图点位:', dbPoints)
-        dbPoints.forEach(row => {
-          const gcjLng = row.gcjlng
-          const gcjLat = row.gcjlat
-          if (!gcjLng || !gcjLat) return
-          const pos = [parseFloat(gcjLng), parseFloat(gcjLat)]
+        const rawLng = Number(rawGpsData.lng)
+        const rawLat = Number(rawGpsData.lat)
+        if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
+          console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
+          return
+        }
 
-          // 创建Marker
-          const marker = new window.AMap.Marker({
-            position: pos,
-            icon: greenIcon
-          })
-          // 创建文字标签
-          const textLabel = new window.AMap.Text({
-            position: pos,
-            text: row.label || '点位',
-            offset: new window.AMap.Pixel(16, -45),
-            style: {
-              color: '#00ff66',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              textShadow: '0 0 3px #000, 0 0 8px #00ff66, 0 0 12px #00ff66',
-              background: 'transparent',
-              border: 'none',
-              whiteSpace: 'nowrap'
-            }
-          })
+        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
+        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
 
-          this.map.add(marker)
-          this.map.add(textLabel)
-          this.dbGreenMarkers.push({ marker, label: textLabel })
+        if (isNaN(gcjLng) || isNaN(gcjLat)) {
+          console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
+          return
+        }
 
-          // 弹窗信息
-          const mainInfoWin = new window.AMap.InfoWindow({
-            content: `
-              <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
-                <div>ID：${row.catalogid}</div>
-                <div>名称：${row.label || ''}</div>
-                <div>类型：${row.protocoltype || ''}</div>
-                <div>GCJ经纬度：${gcjLng},${gcjLat}</div>
-                <div>WGS经纬度：${row.gpslng || ''},${row.gpslat || ''}</div>
-              </div>
-            `,
-            offset: new window.AMap.Pixel(0, -55),
-            anchor: 'bottom-center',
-            isCustom: true
-          })
-          marker.on('mouseover', () => {
-            mainInfoWin.open(this.map, marker.getPosition())
-          })
-          marker.on('mouseout', () => {
-            mainInfoWin.close()
-          })
-          marker.on('dblclick', () => {
-            this.openDevicePanel()
-          })
-        })
-      } catch (err) {
-        console.error('读取数据库点位异常', err)
-      }
-    },
+        // 根据cid查找点位数组下标
+        const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === rawGpsData.cid.trim())
+        if (targetIndex === -1) {
+          console.warn('未匹配到该点位ID：', rawGpsData.cid)
+          return
+        }
+        const currPoint = this.dbGreenMarkers[targetIndex]
+
+        // 校验marker正常挂载地图
+        if (!currPoint.marker || !currPoint.marker.getMap()) {
+          console.warn('Marker脱离地图，无法更新')
+          return
+        }
+
+        // 1、高德原生API 立即切换绿色在线图标
+        currPoint.marker.setIcon(currPoint.greenIcon)
+        currPoint.marker.setZIndex(99)
+        // 更新点位坐标
+        currPoint.marker.setPosition([gcjLng, gcjLat])
+        if (currPoint.label) currPoint.label.setPosition([gcjLng, gcjLat])
+
+        // 2、Vue响应式更新在线状态，右侧表格同步刷新
+        this.$set(currPoint, 'online', true)
+        // 保存最新经纬度
+        currPoint.gcjLng = gcjLng
+        currPoint.gcjLat = gcjLat
+
+        // 3、重建数组引用，强制computed列表刷新
+        this.dbGreenMarkers = [...this.dbGreenMarkers]
+
+        console.log('✅ 在线状态同步完成：地图绿点+表格在线文字已刷新', this.dbGreenMarkers)
+
+      })
+
+      window.globalGpsSubscribed = true
+    }
+
     addManualMarker (pointInfo) {
       // 转为纯数字坐标
       const lng = parseFloat(pointInfo.lng)

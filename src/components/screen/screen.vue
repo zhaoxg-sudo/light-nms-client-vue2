@@ -155,11 +155,13 @@
       <div class="right-box">
         <dv-border-box-1 class="panel">
           <div class="panel-title">设备列表</div>
-          <input
+          <el-input
             type="text"
             class="search-input"
             placeholder="搜索名称/ID"
             v-model="deviceSearch"
+            clearable
+            prefix-icon="el-icon-search"
           />
           <table class="device-table">
             <thead>
@@ -387,37 +389,37 @@ export default {
           return
         }
 
-        const targetPoint = this.dbGreenMarkers.find(item => item.id.trim() === rawGpsData.cid.trim())
-        if (targetPoint) {
-          // 校验marker实例是否挂载地图
-          if (!targetPoint.marker || !targetPoint.marker.getMap()) {
-            console.warn('Marker脱离地图，无法更新')
-            return
-          }
-
-          // 延时推入地图渲染队列
-          setTimeout(() => {
-            // 更新点位坐标
-            targetPoint.marker.setPosition([gcjLng, gcjLat])
-            if (targetPoint.label) {
-              targetPoint.label.setPosition([gcjLng, gcjLat])
-            }
-
-            // 更新在线状态+绿色图标
-            this.$set(targetPoint, 'online', true)
-            targetPoint.marker.setIcon(targetPoint.greenIcon)
-            targetPoint.marker.setTop(true)
-
-            // 保存最新坐标
-            targetPoint.gcjLng = gcjLng
-            targetPoint.gcjLat = gcjLat
-
-            // 触发表格列表刷新
-            this.dbGreenMarkers = [...this.dbGreenMarkers]
-
-            console.log('✅ 点位坐标+在线状态更新完成')
-          }, 80)
+        // 根据cid查找点位数组下标
+        const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === rawGpsData.cid.trim())
+        if (targetIndex === -1) {
+          console.warn('未匹配到该点位ID：', rawGpsData.cid)
+          return
         }
+        const currPoint = this.dbGreenMarkers[targetIndex]
+
+        // 校验marker正常挂载地图
+        if (!currPoint.marker || !currPoint.marker.getMap()) {
+          console.warn('Marker脱离地图，无法更新')
+          return
+        }
+
+        // 1、高德原生API 立即切换绿色在线图标
+        currPoint.marker.setIcon(currPoint.greenIcon)
+        // currPoint.marker.setZIndex(99)
+        // 更新点位坐标
+        currPoint.marker.setPosition([gcjLng, gcjLat])
+        if (currPoint.label) currPoint.label.setPosition([gcjLng, gcjLat])
+
+        // 2、Vue响应式更新在线状态，右侧表格同步刷新
+        this.$set(currPoint, 'online', true)
+        // 保存最新经纬度
+        currPoint.gcjLng = gcjLng
+        currPoint.gcjLat = gcjLat
+
+        // 3、重建数组引用，强制computed列表刷新
+        this.dbGreenMarkers = [...this.dbGreenMarkers]
+
+        console.log('✅ 在线状态同步完成：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
       })
 
       window.globalGpsSubscribed = true

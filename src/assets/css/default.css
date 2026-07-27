@@ -2510,4 +2510,9 @@ ul.orgListPhone>li>span {
     background: #0b1229 !important;
     color: #fff !important;
   }
-  
+  * {
+    outline: none !important;
+  }
+  *::-moz-focus-inner {
+    border: 0;
+  }

@@ -8,6 +8,8 @@
       :default-expanded-keys="defaultExpanded"
       node-key="label"
       @node-click="handleNodeClick"
+      @mouseleave="clearTreeFocus"
+      :tabindex="null"
       :expand-on-click-node="true"
       :render-content="renderContent"
     >
@@ -73,6 +75,18 @@ export default {
       'TreeChange',
       'setInitData'
     ]),
+    clearTreeFocus () {
+      // 1. 页面body获取焦点，抢占全局焦点
+      document.body.focus()
+      // 2. 清空当前激活元素
+      if (document.activeElement) {
+        document.activeElement.blur()
+      }
+      // 3. 清空所有带focus-within的节点缓存状态
+      document.querySelectorAll('.el-tree-node:focus-within').forEach(el => {
+        el.blur()
+      })
+    },
     refresh () {
       this.$ajax.get(this.$appHost + '/localall')
         .then((res) => {
@@ -97,6 +111,10 @@ export default {
         })
     },
     handleNodeClick (data, node, event) {
+      setTimeout(() => {
+        document.body.focus()
+        document.activeElement.blur()
+      }, 0)
       console.log('node click 事件.................................')
       console.log(node.id, data.label)
       if (event) { // 判断点击的是否为默认选中的树节点，如果不是，取消默认选中
@@ -169,7 +187,7 @@ export default {
 
 }
 </script>
-<style scoped>
+<style lang="scss" scoped>
 .el-tree--highlight-current .el-tree-node.is-current>.el-tree-node__content {
     background:#313439;
 }
@@ -186,5 +204,30 @@ export default {
 }
 i {
     margin:0px 5px;
+}
+/* 选中节点常驻背景色（失焦也保留） */
+/deep/ .el-tree--highlight-current .el-tree-node.is-current > .el-tree-node\_\_content {
+  background: #454545;
+  border-radius: 4px;
+}
+
+/* 彻底清除所有白色焦点outline白框（根治烟台市政根节点残留白框） */
+/deep/ .el-tree-node\_\_content {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+/deep/ .el-tree-node\_\_content:focus,
+/deep/ .el-tree-node\_\_content:focus-visible,
+/deep/ .el-tree-node:focus-within {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 鼠标悬浮背景 */
+/deep/ .el-tree-node\_\_content:hover {
+  background: rgba(0, 255, 255, 0.12);
 }
 </style>
