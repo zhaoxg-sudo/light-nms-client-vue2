@@ -155,11 +155,13 @@
       <div class="right-box">
         <dv-border-box-1 class="panel">
           <div class="panel-title">设备列表</div>
-          <input
+          <el-input
             type="text"
             class="search-input"
             placeholder="搜索名称/ID"
             v-model="deviceSearch"
+            clearable
+            prefix-icon="el-icon-search"
           />
           <table class="device-table">
             <thead>
@@ -232,7 +234,7 @@
       </div>
     </div>
   </div>
-  <!-- 全局提示弹窗 替代alert -->
+  <!-- 全局提示弹窗 替代this.showTip -->
   <div class="tip-mask" v-if="showTipModal" @click="showTipModal = false">
     <div class="tip-box">
       <p>{{ tipText }}</p>
@@ -245,8 +247,8 @@
 import $ from 'jquery'
 import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
-import DeviceControlPanel from './devicepanel.vue'
-import MainControlPanel from './mainControlPanel.vue'
+import DeviceControlPanel from '../devicepanel.vue'
+import MainControlPanel from '../mainControlPanel.vue'
 import { getHeight } from '@/utils/height.js'
 import { mapGetters } from 'vuex'
 import {GET_USER_INFO} from '@/store/getters/type'
@@ -371,47 +373,53 @@ export default {
         this.remoteId = rawGpsData.clientKey
         this.deviceOnline = true
         this.lastGps = rawGpsData
-        // ===================== 新增第一层：校验原始经纬度是否合法 =====================
+
         const rawLng = Number(rawGpsData.lng)
         const rawLat = Number(rawGpsData.lat)
-        // 判断：必须是有效数字，国内合理经纬度区间
         if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
           console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
-          return // 非法坐标直接终止后续所有逻辑
+          return
         }
-        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawGpsData.lng, rawGpsData.lat)
+
+        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
         console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
-        // ===================== 第二层：校验转换后坐标 =====================
+
         if (isNaN(gcjLng) || isNaN(gcjLat)) {
           console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
           return
         }
-        // 匹配数据库点位 更新在线状态与坐标
-        const targetPoint = this.dbGreenMarkers.find(item => item.id === rawGpsData.cid)
+
+        const targetPoint = this.dbGreenMarkers.find(item => item.id.trim() === rawGpsData.cid.trim())
         if (targetPoint) {
-          console.log('🔥 实时收到原始GPS(WGS84),匹配到数据库点位', rawGpsData)
-          targetPoint.online = true
-          // ========= 新增：在线切换绿色图标 =========
-          targetPoint.marker.setIcon(targetPoint.greenIcon)
-          // 构建实时坐标对象
-          const realTimePos = new window.AMap.LngLat(gcjLng, gcjLat)
-          // 更新Marker实时位置（核心：跟随GPS移动）
-          targetPoint.marker.setPosition(realTimePos)
-          // 同步更新文字标签位置
-          targetPoint.label.setPosition(realTimePos)
-          // 同步更新点位存储的坐标，持久化最新位置
-          targetPoint.gcjLng = gcjLng
-          targetPoint.gcjLat = gcjLat
+          // 校验marker实例是否挂载地图
+          if (!targetPoint.marker || !targetPoint.marker.getMap()) {
+            console.warn('Marker脱离地图，无法更新')
+            return
+          }
+
+          // 延时推入地图渲染队列
+          setTimeout(() => {
+            // 更新点位坐标
+            targetPoint.marker.setPosition([gcjLng, gcjLat])
+            if (targetPoint.label) {
+              targetPoint.label.setPosition([gcjLng, gcjLat])
+            }
+
+            // 更新在线状态+绿色图标
+            this.$set(targetPoint, 'online', true)
+            targetPoint.marker.setIcon(targetPoint.greenIcon)
+            targetPoint.marker.setTop(true)
+
+            // 保存最新坐标
+            targetPoint.gcjLng = gcjLng
+            targetPoint.gcjLat = gcjLat
+
+            // 触发表格列表刷新
+            this.dbGreenMarkers = [...this.dbGreenMarkers]
+
+            console.log('✅ 点位坐标+在线状态更新完成')
+          }, 80)
         }
-        // console.log('【screen】GPS实时居中点位名称', targetPoint.label)
-        // this.locatePointByID(targetPoint.id)
-        // 停止新上线的站点，居中
-        // if (this.map && this.marker && this.textLabel) {
-        //   const point = new window.AMap.LngLat(gcjLng, gcjLat)
-        //   this.marker.setPosition(point)
-        //   this.textLabel.setPosition(point)
-        //   this.map.setCenter(point)
-        // }
       })
 
       window.globalGpsSubscribed = true
@@ -484,7 +492,7 @@ export default {
     refreshAll () {
       window.location.reload()
     },
-    // 自定义提示弹窗，替代原生alert
+    // 自定义提示弹窗，替代原生this.showTip
     showTip (msg) {
       this.tipText = msg
       this.showTipModal = true
@@ -538,7 +546,7 @@ export default {
         this.remoteId = id
         this.showDevicePanel = true
       } else {
-        // alert('该设备当前离线，无法打开设备控制面板！')
+        // this.showTip('该设备当前离线，无法打开设备控制面板！')
         this.showTip('该设备当前离线，无法打开设备控制面板！')
       }
     },
@@ -559,7 +567,7 @@ export default {
     toggleDrawMode () {
       this.drawPointMode = !this.drawPointMode
       if (this.drawPointMode) {
-        alert('已开启点位配置，点击地图任意位置弹出录入窗口')
+        this.showTip('已开启点位配置，点击地图任意位置弹出录入窗口')
       }
     },
 
@@ -589,7 +597,7 @@ export default {
     // 弹窗确认新增点位
     confirmAddPoint () {
       if (!this.tempPoint.belong || !this.tempPoint.name || !this.tempPoint.id) {
-        alert('归属、点位名称、ID不能为空！')
+        this.showTip('归属、点位名称、ID不能为空！')
         return
       }
       this.addManualMarker(this.tempPoint)
@@ -754,6 +762,31 @@ export default {
             grayIcon
           })
 
+          // // 鼠标移入点位：清除关闭倒计时，打开弹窗
+          // marker.on('mouseover', () => {
+          //   clearTimeout(globalHoverTimer)
+          //   mainInfoWin.open(this.map, marker.getPosition())
+          // })
+
+          // // 鼠标移出点位：500毫秒延时关闭弹窗，预留移动鼠标缓冲时间
+          // marker.on('mouseout', () => {
+          //   globalHoverTimer = setTimeout(() => {
+          //     mainInfoWin.close()
+          //   }, 500)
+          // })
+
+          // // 弹窗打开后，绑定弹窗内部鼠标移入移出事件（核心解决按钮点击失效）
+          // mainInfoWin.on('open', () => {
+          //   const winDom = mainInfoWin.getContentDom()
+          //   // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
+          //   winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
+          //   // 鼠标离开弹窗：重新开启延时关闭
+          //   winDom.onmouseleave = () => {
+          //     globalHoverTimer = setTimeout(() => {
+          //       mainInfoWin.close()
+          //     }, 500)
+          //   }
+          // })
           // 鼠标移入点位：清除关闭倒计时，打开弹窗
           marker.on('mouseover', () => {
             clearTimeout(globalHoverTimer)
@@ -767,24 +800,29 @@ export default {
             }, 500)
           })
 
-          // 弹窗打开后，绑定弹窗内部鼠标移入移出事件（核心解决按钮点击失效）
+          // 弹窗打开后，绑定弹窗内部鼠标移入移出事件
           mainInfoWin.on('open', () => {
-            const winDom = mainInfoWin.getContentDom()
-            // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
-            winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
-            // 鼠标离开弹窗：重新开启延时关闭
-            winDom.onmouseleave = () => {
-              globalHoverTimer = setTimeout(() => {
-                mainInfoWin.close()
-              }, 500)
-            }
-          })
+            // 延时150ms 等待弹窗内部DOM完整渲染完毕
+            setTimeout(() => {
+              const winDom = mainInfoWin.getContentDom()
+              // 必须做空值判断
+              if (!winDom) return
 
+              // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
+              winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
+              // 鼠标离开弹窗：重新开启延时关闭
+              winDom.onmouseleave = () => {
+                globalHoverTimer = setTimeout(() => {
+                  mainInfoWin.close()
+                }, 500)
+              }
+            }, 150)
+          })
           // 双击点位打开设备面板（离线设备禁止打开）
           marker.on('dblclick', () => {
             const target = this.dbGreenMarkers.find(item => item.id === row.catalogid)
             if (!target || !target.online) {
-              alert('设备离线，无法打开面板')
+              this.showTip('设备离线，无法打开面板')
               return
             }
             this.remoteId = row.catalogid
@@ -891,7 +929,7 @@ export default {
 
     saveAllPoints () {
       console.log('待保存点位集合', this.manualPointList)
-      alert(`共${this.manualPointList.length}个点位，数据已打印控制台`)
+      this.showTip(`共${this.manualPointList.length}个点位，数据已打印控制台`)
       // 地图点位，写入数据库
       // axios.post('/api/savePoint', { list: this.manualPointList })
       // insert into DB
@@ -955,11 +993,11 @@ export default {
     // 单击表格行：地图居中定位点位
     handleClickRow (deviceId) {
       const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
-      if (!target) return alert('未找到该点位')
+      if (!target) return this.showTip('未找到该点位')
       const lng = Number(target.gcjLng)
       const lat = Number(target.gcjLat)
       if (isNaN(lng) || isNaN(lat)) {
-        return alert('坐标无效')
+        return this.showTip('坐标无效')
       }
       // 地图缩放+居中到当前点位
       this.map.setZoomAndCenter(16, [lng, lat])
@@ -967,13 +1005,13 @@ export default {
     // 定位地图center by id
     locatePointByID (deviceId) {
       const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
-      if (!target) return alert('未找到该点位')
+      if (!target) return this.showTip('未找到该点位')
       console.log('[screen]居中的点位信息', target)
       const lng = Number(target.gcjLng)
       const lat = Number(target.gcjLat)
       console.log('[screen]居中的点位信息lng=,lat=', lng, lat)
       if (isNaN(lng) || isNaN(lat)) {
-        return alert('坐标无效')
+        return this.showTip('坐标无效')
       }
       this.map.setZoomAndCenter(16, [lng, lat])
       this.remoteId = deviceId
@@ -1072,7 +1110,7 @@ export default {
     // 定位到中心点（按钮调用）
     locateCenterMarker () {
       if (!this.centerMarker) {
-        alert('暂无实时定位标记')
+        this.showTip('暂无实时定位标记')
         return
       }
       const pos = this.centerMarker.getPosition()

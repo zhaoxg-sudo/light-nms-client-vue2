@@ -17,7 +17,11 @@
 
       <div class="top-right">
         <button class="btn" @click="refreshAll">刷新</button>
-        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
+        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '大屏' }}</button>
+        <!-- 新增地图独占按钮 -->
+        <button class="btn" :style="{background: onlyMapMode ? '#00c48c' : '#00ffff'}" @click="switchOnlyMap">
+          {{ onlyMapMode ? '退出地图' : '全屏地图' }}
+        </button>
         <button class="btn" disabled>后台</button>
         <button class="btn" disabled>注销</button>
         <div class="time">{{ nowTime }}</div>
@@ -27,7 +31,7 @@
     <!-- 内容区 -->
     <div class="content-screen">
       <!-- 左侧 -->
-      <div class="left-box">
+      <div class="left-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
           <div class="panel-title"> 项目统计 </div>
           <div class="stat-grid">
@@ -152,7 +156,7 @@
         </dv-border-box-1>
       </div>
 
-      <div class="right-box">
+      <div class="right-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
           <div class="panel-title">设备列表</div>
           <el-input
@@ -301,6 +305,7 @@ export default {
       // 自定义弹窗
       showTipModal: false,
       tipText: '',
+      onlyMapMode: false, // 纯地图模式开关
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -369,7 +374,7 @@ export default {
     if (this.sockets) {
       this.sockets.subscribe('gps', (rawGpsData) => {
         console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
-        window.latestGpsData = rawGpsData
+        // window.latestGpsData = rawGpsData
         this.remoteId = rawGpsData.clientKey
         this.deviceOnline = true
         this.lastGps = rawGpsData
@@ -457,13 +462,13 @@ export default {
     })
 
     if (window.latestGpsData) {
-      const rawData = window.latestGpsData
-      this.remoteId = rawData.clientKey
-      this.deviceOnline = true
-      const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawData.lng, rawData.lat)
-      const point = new window.AMap.LngLat(gcjLng, gcjLat)
-      this.marker.setPosition(point)
-      this.textLabel.setPosition(point)
+      // const rawData = window.latestGpsData
+      // this.remoteId = rawData.clientKey
+      // this.deviceOnline = true
+      // const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawData.lng, rawData.lat)
+      // const point = new window.AMap.LngLat(gcjLng, gcjLat)
+      // this.marker.setPosition(point)
+      // this.textLabel.setPosition(point)
     }
   },
 
@@ -491,6 +496,24 @@ export default {
   methods: {
     refreshAll () {
       window.location.reload()
+    },
+    // 切换纯地图模式：隐藏左右栏，只留地图
+    switchOnlyMap () {
+      this.onlyMapMode = !this.onlyMapMode
+      // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
+      this.$nextTick(() => {
+        // 高德地图重绘
+        if (this.map) {
+          this.map.resize()
+        }
+        // Echarts能耗图表重绘
+        if (this.$refs.chartLine) {
+          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+          if (chart) chart.resize()
+        }
+        // 重新计算页面高度宽度
+        this.getHeightsWidths()
+      })
     },
     // 自定义提示弹窗，替代原生this.showTip
     showTip (msg) {

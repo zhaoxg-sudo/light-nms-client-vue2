@@ -3,7 +3,7 @@
     <el-tree
       ref="tree"
       :data="treeData"
-      highlight-current
+      highlight-current = "false"
       :props="defaultProps"
       :default-expanded-keys="defaultExpanded"
       node-key="label"
@@ -205,29 +205,29 @@ export default {
 i {
     margin:0px 5px;
 }
-/* 选中节点常驻背景色（失焦也保留） */
-/deep/ .el-tree--highlight-current .el-tree-node.is-current > .el-tree-node\_\_content {
-  background: #454545;
-  border-radius: 4px;
+::v-deep .el-tree {
+  background: transparent !important;
 }
 
-/* 彻底清除所有白色焦点outline白框（根治烟台市政根节点残留白框） */
-/deep/ .el-tree-node\_\_content {
+// 箭头图标聚焦清除白边
+::v-deep .el-tree-node\_\_expand-icon:focus,
+::v-deep .el-tree-node\_\_expand-icon:focus-visible {
   outline: none !important;
-  outline-offset: 0 !important;
-  border: none !important;
-  box-shadow: none !important;
+  outline-offset: 0;
 }
-/deep/ .el-tree-node\_\_content:focus,
-/deep/ .el-tree-node\_\_content:focus-visible,
-/deep/ .el-tree-node:focus-within {
-  outline: none !important;
-  border: 0 !important;
+
+// 节点容器全部聚焦清除
+::v-deep .el-tree-node \*:focus,
+::v-deep .el-tree-node \*:focus-visible {
+  outline: 0 !important;
   box-shadow: none !important;
 }
 
-/* 鼠标悬浮背景 */
-/deep/ .el-tree-node\_\_content:hover {
-  background: rgba(0, 255, 255, 0.12);
+// 取消选中高亮、悬浮高亮
+::v-deep .el-tree-node.is-current > .el-tree-node\_\_content {
+  background: transparent !important;
+}
+::v-deep .el-tree-node\_\_content:hover {
+  background: transparent !important;
 }
 </style>

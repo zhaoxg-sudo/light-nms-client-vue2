@@ -71,6 +71,24 @@
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
           <div id="container" class="map-box">
+            <!-- 1、上方：地图中心点按钮 -->
+            <div style="position:absolute;top:60px;right:14px;z-index:1002;">
+              <button class="map-top-btn" @click="goDefaultCenter" title="定位到地图中心点">
+                <img
+                  style="width:20px;height:20px;margin-right:5px;vertical-align:middle;"
+                  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE4Ij48cGF0aCBkPSJNOCAxQzEyIDQgMTYgOSA4IDE3IDAgOSA0IDQgOCAxWiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSI4IiBjeT0iMTAiIHI9IjIiIGZpbGw9IiMwMDc2ZmYiLz48L3N2Zz4="
+                >
+                地图中心点
+              </button>
+            </div>
+            <!-- 2、下方：总控面板 标准实心灯泡图标（单行base64，浏览器稳定解析） -->
+            <div style="position:absolute;top:98px;right:14px;z-index:1002;">
+              <button class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
+                <img style="width:20px;height:20px;margin-right:5px;vertical-align:middle;" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmIiPjxwYXRoIGQ9Ik0xMiAyYTYgNiAwIDAgMC02IDZjMCAyLjMgMS4xOSA0LjQ3IDMgNS43NFYxN2ExIDEgMCAwIDAgMSAxaDZhMSAxIDAgMCAxIDEtMXYtMi4yNmMxLjgxLTEuMjcgMy0zLjM2IDMtNS43NGE2IDYgMCAwIDAtNi02em0wIDEyYTUgNSAwIDAgMS01LTVhNSA1IDAgMCAxIDUgNWgwbS0xIDRoMnYyYyAwIDAgLTEgMC0xIDB2LTJ6bTAgM2gyVjEgaC0ydi0xWiIvPjwvc3ZnPg==">
+                总控面板
+              </button>
+            </div>
+
             <!-- 地图点位工具栏 仅编辑权限用户显示 -->
             <div class="map-tool-bar" v-if="hasPointEditPerm">
               <button
@@ -83,11 +101,26 @@
               <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
               <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
               <button class="tool-btn" @click="locatePoint">定位点位</button>
+              <!-- <button class="tool-btn" @click="goDefaultCenter">地图中心点</button> -->
+              <!-- <div style="position:absolute;top:12px;right:12px;z-index:999;">
+                <button
+                  style="width:44px;height:44px;border:none;border-radius:6px;background:#fff;box-shadow:0 2px 8px #0003;cursor:pointer;padding:6px;"
+                  @click="goDefaultCenter"
+                  title="回到地图默认中心点"
+                >
+                  <img
+                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ0IDQ4Ij48cGF0aCBkPSJNMjIgMiBDMzIgMTIgNDAgMjcgMjIgNDYgNCAyNyAxMiAxMiAyMiAyWiIgZmlsbD0iIzAwNzZmZiIvPjxjaXJjbGUgY3g9IjIyIiBjeT0iMjgiIHI9IjYiIGZpbGw9IndoaXRlIi8+PC9zdmc+"
+                    style="width:100%;height:100%;object-fit:contain;"
+                  />
+                </button>
+              </div> -->
+
+              <!-- <button class="tool-btn" @click="destroyCenterMarker">清空中心点标记</button> -->
             </div>
             <!-- 手动点位列表悬浮面板 -->
             <div class="map-point-list" v-if="manualPointList.length > 0">
-            <div class="list-title">已添加点位({{manualPointList.length}})</div>
-            <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
+              <div class="list-title">已添加点位({{manualPointList.length}})</div>
+              <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
               <span
                 @click="locatePointByIndex(idx)"
                 style="cursor:pointer;"
@@ -109,49 +142,57 @@
               >
               删除
               </button>
-
-            </div>
-          </div>
+             </div>
+           </div>
           </div>
         </dv-border-box-1>
       </div>
 
-      <!-- 右侧设备列表 -->
       <div class="right-box">
         <dv-border-box-1 class="panel">
-          <div class="panel-title"> 设备列表 </div>
+          <div class="panel-title">设备列表</div>
           <input
             type="text"
             class="search-input"
-            placeholder="Please input"
+            placeholder="搜索名称/ID"
+            v-model="deviceSearch"
           />
           <table class="device-table">
             <thead>
               <tr>
                 <th>序号</th>
-                <th>名字</th>
+                <th>点位名称</th>
+                <th>点位ID</th>
                 <th>状态</th>
               </tr>
             </thead>
             <tbody>
-              <tr @dblclick="openDevicePanel">
-                <td>1</td>
-                <td>DEMO</td>
-                <td :class="deviceOnline ? 'online' : 'offline'">
-                  {{ deviceOnline ? '在线' : '离线' }}
+              <tr
+                v-for="(item, idx) in tableList"
+                :key="item.id"
+                @dblclick="handleDblClickRow(item.id)"
+              >
+                <td>{{ idx + 1 }}</td>
+                <td>{{ item.name || "未命名" }}</td>
+                <td>{{ item.id }}</td>
+                <td :class="item.online ? 'online' : 'offline'">
+                  {{ item.online ? "在线" : "离线" }}
                 </td>
+              </tr>
+              <tr v-if="tableList.length === 0">
+                <td colspan="4">暂无点位数据</td>
               </tr>
             </tbody>
           </table>
         </dv-border-box-1>
       </div>
-    </div>
 
     <DeviceControlPanel
       :visible.sync="showDevicePanel"
       :remoteId="remoteId"
     />
-
+    <!-- 总控面板组件，与设备面板写法统一 -->
+    <MainControlPanel :visible="showMainPanel" @close="showMainPanel = false"/>
     <!-- 新增：添加点位弹窗（归属/名称/ID输入） -->
     <div class="point-mask" v-if="showPointDialog">
       <div class="point-dialog">
@@ -191,14 +232,18 @@
 import $ from 'jquery'
 import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
-import DeviceControlPanel from './devicepanel.vue'
+import DeviceControlPanel from '../devicepanel.vue'
+import MainControlPanel from '../mainControlPanel.vue'
 import { getHeight } from '@/utils/height.js'
+import { mapGetters } from 'vuex'
+import {GET_USER_INFO} from '@/store/getters/type'
 
 export default {
   name: 'Screen',
   components: {
     borderBox1,
-    DeviceControlPanel
+    DeviceControlPanel,
+    MainControlPanel
   },
   data () {
     return {
@@ -212,11 +257,13 @@ export default {
       remoteId: '',
       lastGps: null,
       showDevicePanel: false,
+      showMainPanel: false,
       isFullScreen: false,
       manualPointList: [],
       manualMarkers: [],
       drawPointMode: false,
-      userPermissions: ['point:edit', 'device:read'],
+      // userPermissions: ['point:edit', 'device:read'],
+      userPermissions: [],
       // 新增点位弹窗数据
       showPointDialog: false,
       tempPoint: {
@@ -230,14 +277,33 @@ export default {
         wgsLat: ''
       },
       dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
+      deviceSearch: '',
+      centerMarker: null, // 地图中心点临时标记
+      centerLabel: null, // 中心点文字标签
+      defaultLng: 116.331644,
+      defaultLat: 40.043262,
+      loginusertype: '',
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
     }
   },
   computed: {
+    ...mapGetters({
+      get_user_info: GET_USER_INFO
+    }),
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
+    },
+    tableList () {
+      const keyword = this.deviceSearch.trim().toLowerCase()
+      // 直接从数据库点位数组映射表格数据
+      return this.dbGreenMarkers.filter((row) => {
+        const name = String(row.name || '').toLowerCase()
+        const id = String(row.id || '').toLowerCase()
+        if (!keyword) return true
+        return name.includes(keyword) || id.includes(keyword)
+      })
     }
   },
 
@@ -247,6 +313,13 @@ export default {
       getHeight()
       this.getHeightsWidths()
     })
+    this.loginusertype = this.get_user_info.user.usertype
+    console.log('当前登录的用户类型', this.get_user_info.user.username, this.loginusertype)
+    if (this.loginusertype <= 0) {
+      this.userPermissions.push('point:edit')
+    } else {
+      this.userPermissions.push('device:read')
+    }
     if (window.globalGpsSubscribed) {
       return
     }
@@ -262,12 +335,32 @@ export default {
         const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawGpsData.lng, rawGpsData.lat)
         console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
 
-        if (this.map && this.marker && this.textLabel) {
-          const point = new window.AMap.LngLat(gcjLng, gcjLat)
-          this.marker.setPosition(point)
-          this.textLabel.setPosition(point)
-          this.map.setCenter(point)
+        // 匹配数据库点位 更新在线状态与坐标
+        const targetPoint = this.dbGreenMarkers.find(item => item.id === rawGpsData.cid)
+        if (targetPoint) {
+          console.log('🔥 实时收到原始GPS(WGS84),匹配到数据库点位', rawGpsData)
+          targetPoint.online = true
+          // ========= 新增：在线切换绿色图标 =========
+          targetPoint.marker.setIcon(targetPoint.greenIcon)
+          // 构建实时坐标对象
+          const realTimePos = new window.AMap.LngLat(gcjLng, gcjLat)
+          // 更新Marker实时位置（核心：跟随GPS移动）
+          targetPoint.marker.setPosition(realTimePos)
+          // 同步更新文字标签位置
+          targetPoint.label.setPosition(realTimePos)
+          // 同步更新点位存储的坐标，持久化最新位置
+          targetPoint.gcjLng = gcjLng
+          targetPoint.gcjLat = gcjLat
         }
+        // console.log('【screen】GPS实时居中点位名称', targetPoint.label)
+        // this.locatePointByID(targetPoint.id)
+        // 停止新上线的站点，居中
+        // if (this.map && this.marker && this.textLabel) {
+        //   const point = new window.AMap.LngLat(gcjLng, gcjLat)
+        //   this.marker.setPosition(point)
+        //   this.textLabel.setPosition(point)
+        //   this.map.setCenter(point)
+        // }
       })
 
       window.globalGpsSubscribed = true
@@ -313,6 +406,7 @@ export default {
 
   beforeDestroy () {
     clearInterval(this.timer)
+    this.destroyCenterMarker() // 销毁中心点标记
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
     if (document.fullscreenElement) {
@@ -453,6 +547,10 @@ export default {
 
         // ========== 新增：从数据库加载并渲染全部绿色点位 ==========
         await this.loadDbGreenPoints(deviceIcon)
+        // 地图初始化默认中心点（项目初始坐标）
+        const defaultLng = this.defaultLng
+        const defaultLat = this.defaultLat
+        this.createCenterMarker(defaultLng, defaultLat, '地图中心')
 
         // 地图单击打开弹窗录入点位信息（原有逻辑完全不变）
         this.map.on('click', (e) => {
@@ -482,6 +580,13 @@ export default {
     // 新增方法：读取数据库点位渲染绿色marker
     async loadDbGreenPoints (greenIcon) {
       try {
+        // ========= 新增：离线灰色图标定义 =========
+        const grayIcon = new window.AMap.Icon({
+          size: new window.AMap.Size(48, 64),
+          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiM5OTk5OTkiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzFiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiM5OTk5OTkiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzY2NjY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+          imageSize: new window.AMap.Size(48, 64)
+        })
+
         // 先清理旧数据库点位（需提前在data定义 dbGreenMarkers: []）
         this.dbGreenMarkers.forEach(item => {
           this.map.remove(item.marker)
@@ -497,15 +602,25 @@ export default {
         const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
         console.log('【screen】显示的地图点位:', dbPoints)
         dbPoints.forEach(row => {
-          const gcjLng = row.gcjlng
-          const gcjLat = row.gcjlat
-          if (!gcjLng || !gcjLat) return
+          let gcjLng = row.gcjlng
+          let gcjLat = row.gcjlat
+          let gpsLng
+          let gpsLat
+          if (!gcjLng || !gcjLat) {
+            gpsLng = Number(row.gpslng)
+            gpsLat = Number(row.gpslat)
+            if (!gpsLng || !gpsLat) return
+            const [gcjL, gcjLa] = this.wgs84ToGcj02(gpsLng, gpsLat)
+            gcjLng = gcjL
+            gcjLat = gcjLa
+            console.log('【screen】配置了GPS,无高德点位数据:', gcjLng, gcjLat)
+          }
           const pos = [parseFloat(gcjLng), parseFloat(gcjLat)]
 
           // 创建Marker
           const marker = new window.AMap.Marker({
             position: pos,
-            icon: greenIcon
+            icon: grayIcon
           })
           // 创建文字标签
           const textLabel = new window.AMap.Text({
@@ -522,11 +637,6 @@ export default {
               whiteSpace: 'nowrap'
             }
           })
-
-          this.map.add(marker)
-          this.map.add(textLabel)
-          this.dbGreenMarkers.push({ marker, label: textLabel })
-
           // 弹窗信息
           const mainInfoWin = new window.AMap.InfoWindow({
             content: `
@@ -542,6 +652,23 @@ export default {
             anchor: 'bottom-center',
             isCustom: true
           })
+
+          this.map.add(marker)
+          this.map.add(textLabel)
+          // this.dbGreenMarkers.push({ marker, label: textLabel })
+          // 存入数组，提供给右侧表格使用
+          this.dbGreenMarkers.push({
+            id: row.catalogid,
+            name: row.label,
+            gcjLng,
+            gcjLat,
+            marker,
+            label: textLabel,
+            mainInfoWin,
+            online: false, // 默认离线，GPS收到数据更新为true
+            greenIcon,
+            grayIcon
+          })
           marker.on('mouseover', () => {
             mainInfoWin.open(this.map, marker.getPosition())
           })
@@ -549,6 +676,12 @@ export default {
             mainInfoWin.close()
           })
           marker.on('dblclick', () => {
+            const target = this.dbGreenMarkers.find(item => item.id === row.catalogid)
+            if (!target || !target.online) {
+              alert('设备离线，无法打开面板')
+              return
+            }
+            this.remoteId = row.catalogid
             this.openDevicePanel()
           })
         })
@@ -713,7 +846,34 @@ export default {
       this.map.setCenter([firstPoint.lng, firstPoint.lat])
       this.map.setZoom(14)
     },
-
+    // 双击表格行定位地图
+    handleDblClickRow (deviceId) {
+      const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
+      if (!target) return alert('未找到该点位')
+      console.log('[screen]双击的点位信息', target)
+      const lng = Number(target.gcjLng)
+      const lat = Number(target.gcjLat)
+      console.log('[screen]双击的点位信息lng=,lat=', lng, lat)
+      if (isNaN(lng) || isNaN(lat)) {
+        return alert('坐标无效')
+      }
+      this.map.setZoomAndCenter(16, [lng, lat])
+      this.remoteId = deviceId
+    },
+    // 定位地图center by id
+    locatePointByID (deviceId) {
+      const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
+      if (!target) return alert('未找到该点位')
+      console.log('[screen]居中的点位信息', target)
+      const lng = Number(target.gcjLng)
+      const lat = Number(target.gcjLat)
+      console.log('[screen]居中的点位信息lng=,lat=', lng, lat)
+      if (isNaN(lng) || isNaN(lat)) {
+        return alert('坐标无效')
+      }
+      this.map.setZoomAndCenter(16, [lng, lat])
+      this.remoteId = deviceId
+    },
     gcj02ToWgs84 (gcjLon, gcjLat) {
       const PI = 3.1415926535897932384626
       const a = 6378245.0
@@ -747,6 +907,72 @@ export default {
       const wgsLat = gcjLat - dLat
       const wgsLon = gcjLon - dLon
       return [wgsLon, wgsLat]
+    },
+    goDefaultCenter () {
+      const lng = this.defaultLng
+      const lat = this.defaultLat
+      console.log('[screen]默认居中的点位:gcjlng=, gcjlat=', lng, lat)
+      this.map.setZoomAndCenter(12, [lng, lat])
+      this.createCenterMarker(lng, lat, '地图中心')
+    },
+
+    // 创建地图中心点临时标记
+    createCenterMarker (lng, lat, name) {
+      this.destroyCenterMarker()
+      const pos = new window.AMap.LngLat(lng, lat)
+      // 水滴中心点图标
+      const dropIcon = new window.AMap.Icon({
+        size: new window.AMap.Size(44, 48),
+        image: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ0IDQ4Ij48cGF0aCBkPSJNMjIgMiBDMzIgMTIgNDAgMjcgMjIgNDYgNCAyNyAxMiAxMiAyMiAyWiIgZmlsbD0iIzAwNzZmZiIvPjxjaXJjbGUgY3g9IjIyIiBjeT0iMjgiIHI9IjYiIGZpbGw9IndoaXRlIi8+PC9zdmc+',
+        imageSize: new window.AMap.Size(44, 48)
+      })
+
+      this.centerMarker = new window.AMap.Marker({
+        position: pos,
+        icon: dropIcon,
+        zIndex: 999,
+        title: '地图中心点' // ✅ 鼠标悬浮内置tooltip
+      })
+      // this.centerLabel = new window.AMap.Text({
+      //   position: pos,
+      //   text: name,
+      //   offset: new window.AMap.Pixel(0, -60),
+      //   style: {
+      //     color: '#ffffff', // 纯白色文字，对比度拉满
+      //     fontSize: '16px', // 字号放大2px
+      //     fontWeight: 'bold', // 加粗更清晰
+      //     background: 'rgba(0,0,0,0.85)', // 加深黑色背景，遮挡地图底色
+      //     padding: '3px 8px', // 增加内边距，文字不贴边框
+      //     borderRadius: '4px',
+      //     whiteSpace: 'nowrap',
+      //     textShadow: '0 0 4px #000' // 文字描边防融合
+      //   }
+      // })
+      this.centerLabel = null
+      this.map.add(this.centerMarker)
+      // this.map.add(this.centerLabel)
+    },
+
+    // 销毁中心点标记
+    destroyCenterMarker () {
+      if (this.centerMarker) {
+        this.map.remove(this.centerMarker)
+        this.centerMarker = null
+      }
+      if (this.centerLabel) {
+        this.map.remove(this.centerLabel)
+        this.centerLabel = null
+      }
+    },
+
+    // 定位到中心点（按钮调用）
+    locateCenterMarker () {
+      if (!this.centerMarker) {
+        alert('暂无实时定位标记')
+        return
+      }
+      const pos = this.centerMarker.getPosition()
+      this.map.setZoomAndCenter(16, [pos.lng, pos.lat])
     },
 
     getHeightsWidths () {
@@ -1040,7 +1266,13 @@ export default {
   height: calc(100% - 60px) !important;
   padding-bottom: 15px !important;
 }
-
+/**/
+/* .screen-full .orgTreeList {
+  z-index: 99999 !important;
+}
+.screen-full .openTreeList {
+  z-index: 99999 !important;
+} */
 /* ====== 仅追加点位相关样式（不改动原有左侧布局！）====== */
 .map-tool-bar {
   position: absolute;
@@ -1176,5 +1408,42 @@ export default {
   background-position: right 10px center;
   padding-right: 30px;
 }
-
+/* 地图中心点 */
+.map-locate-btn {
+  height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 4px;
+  background: #0a78ff;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  display:inline-flex;
+  align-items:center;
+}
+.map-locate-btn:hover {
+  background: #0866dd;
+}
+/*眼睛全局看板*/
+.map-top-btn {
+  height: 36px;
+  width: 128px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 3px; /* 圆角收小一点 */
+  background-color: #0a78ff;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 加深阴影适配深色背景 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.map-top-btn:hover {
+  background-color: #0767dd;
+}
 </style>

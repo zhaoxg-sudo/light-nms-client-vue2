@@ -71,24 +71,13 @@
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
           <div id="container" class="map-box">
-            <!-- 1、上方：地图中心点按钮 -->
-            <div style="position:absolute;top:60px;right:14px;z-index:1002;">
-              <button class="map-top-btn" @click="goDefaultCenter" title="定位到地图中心点">
-                <img
-                  style="width:20px;height:20px;margin-right:5px;vertical-align:middle;"
-                  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE4Ij48cGF0aCBkPSJNOCAxQzEyIDQgMTYgOSA4IDE3IDAgOSA0IDQgOCAxWiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSI4IiBjeT0iMTAiIHI9IjIiIGZpbGw9IiMwMDc2ZmYiLz48L3N2Zz4="
-                >
-                地图中心点
+            <!-- 【新增：右上角地图定位按钮，独立于工具栏，无权限限制】 -->
+            <div style="position:absolute;top:12px;right:12px;z-index:1000;">
+              <button class="map-locate-btn" @click="goDefaultCenter" title="定位到地图中心点">
+                <img style="width:26px;height:22px;margin-right:4px;vertical-align:middle;"
+                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE4Ij48cGF0aCBkPSJNOCAxQzEyIDQgMTYgOSA4IDE3IDAgOSA0IDQgOCAxWiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSI4IiBjeT0iMTAiIHI9IjIiIGZpbGw9IiMwMDc2ZmYiLz48L3N2Zz4=">
               </button>
             </div>
-            <!-- 2、下方：总控面板 标准实心灯泡图标（单行base64，浏览器稳定解析） -->
-            <div style="position:absolute;top:98px;right:14px;z-index:1002;">
-              <button class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
-                <img style="width:20px;height:20px;margin-right:5px;vertical-align:middle;" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmIiPjxwYXRoIGQ9Ik0xMiAyYTYgNiAwIDAgMC02IDZjMCAyLjMgMS4xOSA0LjQ3IDMgNS43NFYxN2ExIDEgMCAwIDAgMSAxaDZhMSAxIDAgMCAxIDEtMXYtMi4yNmMxLjgxLTEuMjcgMy0zLjM2IDMtNS43NGE2IDYgMCAwIDAtNi02em0wIDEyYTUgNSAwIDAgMS01LTVhNSA1IDAgMCAxIDUgNWgwbS0xIDRoMnYyYyAwIDAgLTEgMC0xIDB2LTJ6bTAgM2gyVjEgaC0ydi0xWiIvPjwvc3ZnPg==">
-                总控面板
-              </button>
-            </div>
-
             <!-- 地图点位工具栏 仅编辑权限用户显示 -->
             <div class="map-tool-bar" v-if="hasPointEditPerm">
               <button
@@ -191,8 +180,7 @@
       :visible.sync="showDevicePanel"
       :remoteId="remoteId"
     />
-    <!-- 总控面板组件，与设备面板写法统一 -->
-    <MainControlPanel :visible="showMainPanel" @close="showMainPanel = false"/>
+
     <!-- 新增：添加点位弹窗（归属/名称/ID输入） -->
     <div class="point-mask" v-if="showPointDialog">
       <div class="point-dialog">
@@ -232,8 +220,7 @@
 import $ from 'jquery'
 import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
-import DeviceControlPanel from './devicepanel.vue'
-import MainControlPanel from './mainControlPanel.vue'
+import DeviceControlPanel from '../devicepanel.vue'
 import { getHeight } from '@/utils/height.js'
 import { mapGetters } from 'vuex'
 import {GET_USER_INFO} from '@/store/getters/type'
@@ -242,8 +229,7 @@ export default {
   name: 'Screen',
   components: {
     borderBox1,
-    DeviceControlPanel,
-    MainControlPanel
+    DeviceControlPanel
   },
   data () {
     return {
@@ -257,7 +243,6 @@ export default {
       remoteId: '',
       lastGps: null,
       showDevicePanel: false,
-      showMainPanel: false,
       isFullScreen: false,
       manualPointList: [],
       manualMarkers: [],
@@ -1424,26 +1409,5 @@ export default {
 }
 .map-locate-btn:hover {
   background: #0866dd;
-}
-/*眼睛全局看板*/
-.map-top-btn {
-  height: 36px;
-  width: 128px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 3px; /* 圆角收小一点 */
-  background-color: #0a78ff;
-  color: #ffffff;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 加深阴影适配深色背景 */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-.map-top-btn:hover {
-  background-color: #0767dd;
 }
 </style>
