@@ -552,7 +552,11 @@ export default {
       this.$nextTick(() => {
         // 高德地图重绘
         if (this.map) {
-          this.map.resize()
+          // this.map.resize()
+          // 高德地图重绘：双重校验实例+resize方法是否存在
+          if (this.map && typeof this.map.resize === 'function') {
+            this.map.resize()
+          }
         }
         // Echarts能耗图表重绘
         if (this.$refs.chartLine) {
@@ -688,7 +692,11 @@ export default {
         window.AMap.plugin(['AMap.ToolBar', 'AMap.PlaceSearch'], () => {
           // 实例化工具栏，开启内置搜索输入框
           const toolBar = new window.AMap.ToolBar({
-            position: 'LT', // 左上角摆放
+            // position: {
+            //   left: '10px',
+            //   top: '40px'
+            // },
+            position: 'LT',
             searchBar: true, // 开启地图原生搜索框
             autoShow: true
           })
@@ -850,31 +858,6 @@ export default {
             grayIcon
           })
 
-          // // 鼠标移入点位：清除关闭倒计时，打开弹窗
-          // marker.on('mouseover', () => {
-          //   clearTimeout(globalHoverTimer)
-          //   mainInfoWin.open(this.map, marker.getPosition())
-          // })
-
-          // // 鼠标移出点位：500毫秒延时关闭弹窗，预留移动鼠标缓冲时间
-          // marker.on('mouseout', () => {
-          //   globalHoverTimer = setTimeout(() => {
-          //     mainInfoWin.close()
-          //   }, 500)
-          // })
-
-          // // 弹窗打开后，绑定弹窗内部鼠标移入移出事件（核心解决按钮点击失效）
-          // mainInfoWin.on('open', () => {
-          //   const winDom = mainInfoWin.getContentDom()
-          //   // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
-          //   winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
-          //   // 鼠标离开弹窗：重新开启延时关闭
-          //   winDom.onmouseleave = () => {
-          //     globalHoverTimer = setTimeout(() => {
-          //       mainInfoWin.close()
-          //     }, 500)
-          //   }
-          // })
           // 鼠标移入点位：清除关闭倒计时，打开弹窗
           marker.on('mouseover', () => {
             clearTimeout(globalHoverTimer)
@@ -1579,7 +1562,7 @@ export default {
 /* ====== 仅追加点位相关样式（不改动原有左侧布局！）====== */
 .map-tool-bar {
   position: absolute;
-  top: 10px;
+  top: 10px !important;  /* 10px → 20px，整体向下偏移10px，和顶部搜索框纵向对齐更协调 */
   left: 10px;
   z-index: 999;
   display: flex;
@@ -1831,7 +1814,11 @@ export default {
 /deep/ .map-search-wrap .el-input__clear {
   color: rgba(255,255,255,0.8);
 }
-
+/* 高德原生工具栏整体下移 */
+/deep/ .amap-toolbar {
+  top: 40px !important;
+  left: 16px !important;
+}
 /* 下拉结果面板：全部沿用原有样式，无任何修改 */
 .search-dropdown-panel {
   margin-top: 6px;
