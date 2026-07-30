@@ -3,14 +3,14 @@
     <!-- 顶部导航 -->
     <div class="top-bar">
       <div class="top-left">
-        <span>项目</span>
+        <!-- <span>项目</span>
         <select class="select">
           <option>三合云海</option>
         </select>
         <span>设备</span>
         <select class="select">
           <option>DEMO</option>
-        </select>
+        </select> -->
       </div>
 
       <div class="top-title">LED智慧照明管理平台</div>
@@ -22,9 +22,9 @@
         <button class="btn" :style="{background: onlyMapMode ? '#00c48c' : '#00ffff'}" @click="switchOnlyMap">
           {{ onlyMapMode ? '退出地图' : '全屏地图' }}
         </button>
-        <button class="btn" disabled>后台</button>
-        <button class="btn" disabled>注销</button>
-        <div class="time">{{ nowTime }}</div>
+        <!-- <button class="btn" disabled>后台</button>
+        <button class="btn" disabled>注销</button> -->
+        <!-- <div class="time">{{ nowTime }}</div> -->
       </div>
     </div>
 
@@ -75,6 +75,45 @@
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
           <div id="container" class="map-box">
+            <!-- ========== 新增：地图顶部居中搜索框 ========== -->
+            <div class="map-search-wrap">
+              <el-input
+                v-model="searchKey"
+                placeholder="搜索设备ID/名称 | 地址地点"
+                clearable
+                prefix-icon="el-icon-search"
+                @input="handleSearch"
+                @focus="showDropdown = true"
+                @blur="hideDropdownTimer"
+              ></el-input>
+              <!-- 下拉结果面板 -->
+              <div v-if="showDropdown && totalResult.length" class="search-dropdown-panel">
+                <!-- 匹配到的设备分组 -->
+                <div v-if="matchDeviceList.length" class="dropdown-group-title">设备点位</div>
+                <div
+                  v-for="dev in matchDeviceList"
+                  :key="dev.id"
+                  class="dropdown-item device-item"
+                  @click="selectDeviceItem(dev)"
+                >
+                  <div class="item-name">{{ dev.name || '未命名点位' }}</div>
+                  <div class="item-desc">ID：{{ dev.id }}｜{{ dev.online ? '在线' : '离线' }}</div>
+                </div>
+
+                <!-- 高德地址搜索分组 -->
+                <div v-if="matchPoiList.length" class="dropdown-group-title">地理位置</div>
+                <div
+                  v-for="poi in matchPoiList"
+                  :key="poi.id"
+                  class="dropdown-item poi-item"
+                  @click="selectPoiItem(poi)"
+                >
+                  <div class="item-name">{{ poi.name }}</div>
+                  <div class="item-desc">{{ poi.district }}{{ poi.address }}</div>
+                </div>
+              </div>
+            </div>
+            <!-- ============================================== -->
            <!-- 1、上方：地图中心点 -->
           <div style="position:absolute;top:60px;right:14px;z-index:1002;">
             <button class="map-top-btn" @click="goDefaultCenter" title="定位到地图中心点">
@@ -306,6 +345,15 @@ export default {
       showTipModal: false,
       tipText: '',
       onlyMapMode: false, // 纯地图模式开关
+      // ========== 新增搜索变量 ==========
+      searchKey: '',
+      showDropdown: false,
+      placeSearch: null, // 高德地点搜索实例
+      matchDeviceList: [], // 匹配设备结果
+      matchPoiList: [], // 高德地址结果
+      totalResult: [], // 合并总结果（控制下拉显示）
+      dropdownTimer: null, // 失焦延时关闭定时器
+
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -635,6 +683,23 @@ export default {
           zoom: 12,
           center: [initLng, initLat],
           resizeEnable: true
+        })
+        // ====== 新增：手动创建工具栏控件（包含搜索框）======
+        window.AMap.plugin(['AMap.ToolBar', 'AMap.PlaceSearch'], () => {
+          // 实例化工具栏，开启内置搜索输入框
+          const toolBar = new window.AMap.ToolBar({
+            position: 'LT', // 左上角摆放
+            searchBar: true, // 开启地图原生搜索框
+            autoShow: true
+          })
+          // 把控件添加到地图
+          this.map.addControl(toolBar)
+
+          // 你的地点搜索实例保持原有代码不变
+          this.placeSearch = new window.AMap.PlaceSearch({
+            city: '北京',
+            pageSize: 8
+          })
         })
 
         // ========== 移除原固定单个DEMO marker代码，改为动态读取数据库点位 ==========
@@ -1139,6 +1204,64 @@ export default {
       const pos = this.centerMarker.getPosition()
       this.map.setZoomAndCenter(16, [pos.lng, pos.lat])
     },
+    // ========== 新增搜索全套方法 ==========
+    // 输入关键词执行搜索：优先级 设备 > 高德地址
+    handleSearch () {
+      const keyword = this.searchKey.trim().toLowerCase()
+      // 清空所有结果
+      this.matchDeviceList = []
+      this.matchPoiList = []
+      this.totalResult = []
+      clearTimeout(this.dropdownTimer)
+
+      if (!keyword) {
+        this.showDropdown = false
+        return
+      }
+
+      // 第一步：优先模糊检索本地设备（ID、点位名称）
+      this.matchDeviceList = this.dbGreenMarkers.filter(item => {
+        const name = String(item.name || '').toLowerCase()
+        const id = String(item.id).toLowerCase()
+        return name.includes(keyword) || id.includes(keyword)
+      })
+
+      // 第二步：无设备匹配，再调用高德搜索地理位置
+      if (this.matchDeviceList.length === 0 && this.placeSearch) {
+        this.placeSearch.search(keyword, (status, res) => {
+          if (status === 'complete' && res.poiList.pois.length) {
+            this.matchPoiList = res.poiList.pois
+          }
+          this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
+        })
+      } else {
+        // 有设备结果，不需要请求高德
+        this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
+      }
+    },
+
+    // 选中设备：地图居中定位点位
+    selectDeviceItem (device) {
+      this.searchKey = device.name || device.id
+      this.showDropdown = false
+      // 调用原有点击行定位方法，复用现有逻辑
+      this.handleClickRow(device.id)
+    },
+
+    // 选中高德地址：地图定位到地理坐标
+    selectPoiItem (poi) {
+      this.searchKey = poi.name
+      this.showDropdown = false
+      const [lng, lat] = poi.location.split(',')
+      this.map.setZoomAndCenter(15, [Number(lng), Number(lat)])
+    },
+
+    // 输入框失焦，延时关闭下拉（防止点击列表直接消失）
+    hideDropdownTimer () {
+      this.dropdownTimer = setTimeout(() => {
+        this.showDropdown = false
+      }, 220)
+    },
 
     getHeightsWidths () {
       var contentHeight = $(window).height() - 110
@@ -1237,6 +1360,8 @@ export default {
   border-bottom: 1px solid #00ffff;
   flex-shrink: 0;
   box-sizing: border-box !important;
+  /* 相对定位，让标题以顶部栏整体居中，不被左右按钮挤压 */
+  position: relative;
 }
 .top-left,
 .top-right {
@@ -1258,9 +1383,22 @@ export default {
   cursor: pointer;
 }
 .top-title {
+  /* 清空原有流式布局居中 */
+  width: auto;
+  text-align: unset;
+  margin: 0;
+  padding: 0;
+  /* 全局居中核心样式 */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap; /* 文字不换行 */
   font-size: 26px;
+  font-weight: 600;
   color: #00ffff;
-  font-weight: bold;
+  letter-spacing: 1.5px;
+  z-index: 2; /* 层级高于两侧按钮，不会被遮挡 */
 }
 .time {
   color: #00ffff;
@@ -1643,6 +1781,94 @@ export default {
   border: none;
   border-radius: 3px;
   cursor: pointer;
+}
+/* ========== 地图搜索框自定义样式【已修改：对齐右侧map-top-btn蓝色按钮样式】 ========== */
+.map-search-wrap {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px; /* 改动：宽度由460px → 420px */
+  z-index: 1005;
+}
+/* Vue2 scoped必须 /deep/ 穿透ElementUI内部DOM */
+/deep/ .map-search-wrap .el-input__inner {
+  height: 36px; /* 改动：高度42px → 36px 和按钮等高 */
+  line-height: 36px; /* 新增：文字垂直居中 */
+  background-color: #0a78ff; /* 改动：半透明深蓝 → 按钮纯色蓝底色 */
+  border: none; /* 改动：取消青蓝色边框 */
+  border-radius: 3px; /* 改动：圆角8px → 3px 和按钮圆角一致 */
+  color: #ffffff;
+  font-size: 14px; /* 改动：字号15px→14px */
+  padding-left: 42px; /* 新增：左侧留白放搜索图标 */
+  padding-right: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 改动：阴影替换为按钮同款阴影 */
+  transition: background-color 0.2s ease; /* 新增：背景色过渡动画 */
+}
+/* 搜索前置图标变白 */
+/deep/ .map-search-wrap .el-input__prefix {
+  color: #fff;
+  left: 14px;
+}
+/* 占位符文字半透明白色 */
+/deep/ .map-search-wrap .el-input__inner::placeholder {
+  color: rgba(255, 255, 255, 0.72);
+}
+/* 悬浮hover效果 同按钮 */
+/deep/ .map-search-wrap .el-input__inner:hover {
+  background-color: #0767dd;
+}
+/* 输入框聚焦样式 */
+/deep/ .map-search-wrap .el-input__inner:focus {
+  background-color: #065bc9;
+  box-shadow: 0 0 0 2px rgba(10, 120, 255, 0.35), 0 2px 6px rgba(0,0,0,0.45);
+}
+/* 清除浏览器默认聚焦轮廓 */
+/deep/ .map-search-wrap .el-input__inner:focus-visible {
+  outline: none;
+}
+/* 清空按钮颜色适配白色主题 */
+/deep/ .map-search-wrap .el-input__clear {
+  color: rgba(255,255,255,0.8);
+}
+
+/* 下拉结果面板：全部沿用原有样式，无任何修改 */
+.search-dropdown-panel {
+  margin-top: 6px;
+  background: rgba(11, 18, 41, 0.96);
+  border: 1px solid #00ffff;
+  border-radius: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.dropdown-group-title {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #00ffff;
+  background: rgba(0, 60, 120, 0.3);
+}
+.dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.dropdown-item:hover {
+  background: rgba(0, 255, 255, 0.15);
+}
+.item-name {
+  font-size: 14px;
+  color: #ffffff;
+}
+.item-desc {
+  font-size: 12px;
+  color: #99ccdd;
+  margin-top: 3px;
+}
+.device-item .item-name {
+  color: #00ff66;
+}
+.poi-item .item-name {
+  color: #00ffff;
 }
 
 </style>
