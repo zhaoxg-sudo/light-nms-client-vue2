@@ -15,6 +15,10 @@ export default {
   TreeChange ({commit}, val) {
     commit('TREECHANGE', val)
   },
+  // map set point
+  updatePoint ({commit}, val) {
+    commit('UPDATEPOINT', val)
+  },
   // 报警
   alarmReport ({commit}, val) {
     commit('ALARMREPORT', val)

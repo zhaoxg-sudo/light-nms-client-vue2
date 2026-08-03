@@ -18,6 +18,6 @@ export default {
   TreeData: {},
   // 点击树菜单的 obj
   TreeObj: {},
-  // 联动map set center
-  treeClickState: {}
+  // 联动map set new point
+  updatePoint: {}
 }

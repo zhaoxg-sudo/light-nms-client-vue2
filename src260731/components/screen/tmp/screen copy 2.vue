@@ -1,0 +1,915 @@
+<template>
+  <div class="screen-page" :class="{ 'screen-full': isFullScreen }">
+    <!-- 顶部导航 -->
+    <div class="top-bar">
+      <div class="top-left">
+        <span>项目</span>
+        <select class="select">
+          <option>三合云海</option>
+        </select>
+        <span>设备</span>
+        <select class="select">
+          <option>DEMO</option>
+        </select>
+      </div>
+
+      <div class="top-title">LED智能照明及能源管理平台</div>
+
+      <div class="top-right">
+        <button class="btn" @click="refreshAll">刷新</button>
+        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '全屏' }}</button>
+        <button class="btn" disabled>后台</button>
+         <button class="btn" disabled>注销</button>
+        <div class="time">{{ nowTime }}</div>
+      </div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content-screen">
+      <!-- 左侧 -->
+      <div class="left-box">
+        <dv-border-box-1 class="panel">
+          <div class="panel-title"> 项目统计 </div>
+          <div class="stat-grid">
+            <!-- 第一行 -->
+            <div class="stat-card">
+              <div class="num">0.23</div>
+              <div class="unit">(kW)</div>
+              <div class="label">总功率</div>
+            </div>
+            <div class="stat-card">
+              <div class="num">90.68</div>
+              <div class="unit">(kWh)</div>
+              <div class="label">总累计消耗</div>
+            </div>
+            <!-- 第二行 -->
+            <div class="stat-card">
+              <div class="num">90.68</div>
+              <div class="unit">(kWh)</div>
+              <div class="label">今年累计消耗</div>
+            </div>
+            <div class="stat-card">
+              <div class="num">100</div>
+              <div class="unit"></div>
+              <div class="label">部署站点</div>
+            </div>
+          </div>
+        </dv-border-box-1>
+
+        <dv-border-box-1 class="panel m-top">
+          <div class="panel-title"> 能耗 </div>
+          <div class="date-box">
+            <span>日期</span>
+            <input type="month" v-model="month" class="input-month" />
+          </div>
+          <div class="chart-title">2026年6月每日有功电耗</div>
+          <div ref="chartLine" class="chart"></div>
+        </dv-border-box-1>
+      </div>
+
+      <!-- 中间地图 -->
+      <div class="center-box">
+        <dv-border-box-1 class="panel map-panel">
+          <div id="container" class="map-box">
+            <!-- 地图点位工具栏 仅编辑权限用户显示 -->
+            <div class="map-tool-bar" v-if="hasPointEditPerm">
+              <button
+                class="tool-btn"
+                :class="{active: drawPointMode}"
+                @click="toggleDrawMode"
+              >
+                {{ drawPointMode ? '关闭打点' : '开启点位配置' }}
+              </button>
+              <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
+              <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
+            </div>
+            <!-- 手动点位列表悬浮面板 -->
+            <div class="map-point-list" v-if="manualPointList.length > 0">
+              <div class="list-title">已添加点位({{manualPointList.length}})</div>
+              <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
+                <span>{{idx+1}} GCJ:{{item.lng}},{{item.lat}}</span>
+                <button @click="removePoint(idx)">删除</button>
+              </div>
+            </div>
+          </div>
+        </dv-border-box-1>
+      </div>
+
+      <!-- 右侧设备列表 -->
+      <div class="right-box">
+        <dv-border-box-1 class="panel">
+          <div class="panel-title"> 设备列表 </div>
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Please input"
+          />
+          <table class="device-table">
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>名字</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr @dblclick="openDevicePanel">
+                <td>1</td>
+                <td>DEMO</td>
+                <td :class="deviceOnline ? 'online' : 'offline'">
+                  {{ deviceOnline ? '在线' : '离线' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </dv-border-box-1>
+      </div>
+    </div>
+
+    <DeviceControlPanel
+      :visible.sync="showDevicePanel"
+      :remoteId="remoteId"
+    />
+  </div>
+</template>
+
+<script>
+import $ from 'jquery'
+import { borderBox1 } from '@jiaminghi/data-view'
+import * as echarts from 'echarts'
+import DeviceControlPanel from './devicepanel.vue'
+import { getHeight } from '@/utils/height.js'
+
+export default {
+  name: 'Screen',
+  components: {
+    borderBox1,
+    DeviceControlPanel
+  },
+  data () {
+    return {
+      nowTime: '',
+      month: '',
+      timer: null,
+      map: null,
+      marker: null,
+      textLabel: null,
+      deviceOnline: false,
+      remoteId: '',
+      lastGps: null,
+      showDevicePanel: false,
+      isFullScreen: false,
+      manualPointList: [],
+      manualMarkers: [],
+      drawPointMode: false,
+      userPermissions: ['point:edit', 'device:read']
+    }
+  },
+  computed: {
+    hasPointEditPerm () {
+      return this.userPermissions.includes('point:edit')
+    }
+  },
+
+  created () {
+    this.$nextTick(() => {
+      $('.orgTreeList').removeClass('treeListShow').addClass('treeListHide')
+      getHeight()
+      this.getHeightsWidths()
+    })
+    if (window.globalGpsSubscribed) {
+      return
+    }
+
+    if (this.sockets) {
+      this.sockets.subscribe('gps', (rawGpsData) => {
+        console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
+        window.latestGpsData = rawGpsData
+        this.remoteId = rawGpsData.clientKey
+        this.deviceOnline = true
+        this.lastGps = rawGpsData
+
+        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawGpsData.lng, rawGpsData.lat)
+        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+
+        if (this.map && this.marker && this.textLabel) {
+          const point = new window.AMap.LngLat(gcjLng, gcjLat)
+          this.marker.setPosition(point)
+          this.textLabel.setPosition(point)
+          this.map.setCenter(point)
+        }
+      })
+
+      window.globalGpsSubscribed = true
+    }
+  },
+
+  mounted () {
+    this.updateTime()
+    this.timer = setInterval(() => this.updateTime(), 1000)
+    this.initMap()
+
+    window.__screenResizeHandler = () => {
+      this.$nextTick(() => {
+        this.getHeightsWidths()
+      })
+    }
+    window.addEventListener('resize', window.__screenResizeHandler)
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        this.isFullScreen = false
+        this.$nextTick(() => {
+          const fullBtn = document.querySelector('.top-right .btn:nth-child(2)')
+          if (fullBtn) fullBtn.blur()
+        })
+      }
+    })
+
+    if (window.latestGpsData) {
+      const rawData = window.latestGpsData
+      this.remoteId = rawData.clientKey
+      this.deviceOnline = true
+      const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawData.lng, rawData.lat)
+      const point = new window.AMap.LngLat(gcjLng, gcjLat)
+      this.marker.setPosition(point)
+      this.textLabel.setPosition(point)
+      this.map.setCenter(point)
+    }
+  },
+
+  beforeRouteLeave (to, from, next) {
+    next()
+  },
+
+  beforeDestroy () {
+    clearInterval(this.timer)
+    window.removeEventListener('resize', window.__screenResizeHandler)
+    delete window.__screenResizeHandler
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+    }
+    if (this.map) {
+      this.map.destroy()
+    }
+    window.currentMapInstance = null
+    window.currentMapMarker = null
+    window.currentMapText = null
+  },
+
+  sockets: {},
+  methods: {
+    refreshAll () {
+      window.location.reload()
+    },
+    wgs84ToGcj02 (wgsLon, wgsLat) {
+      const PI = 3.1415926535897932384626
+      const a = 6378245.0
+      const ee = 0.00669342162296594323
+
+      const outOfChina = (lon, lat) => {
+        return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
+      }
+      if (outOfChina(wgsLon, wgsLat)) {
+        return [wgsLon, wgsLat]
+      }
+
+      const transformLat = (x, y) => {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+        ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+        ret += (160.0 * Math.sin(y / 12.0 * PI) + 320.0 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+        return ret
+      }
+      const transformLon = (x, y) => {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+        ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+        ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
+        return ret
+      }
+
+      let dLat = transformLat(wgsLon - 105.0, wgsLat - 35.0)
+      let dLon = transformLon(wgsLon - 105.0, wgsLat - 35.0)
+      const radLat = wgsLat / 180.0 * PI
+      const magic = Math.sin(radLat)
+      const magic2 = 1 - ee * magic * magic
+      const sqrtMagic = Math.sqrt(magic2)
+      dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic2 * sqrtMagic) * PI)
+      dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
+      const gcjLat = wgsLat + dLat
+      const gcjLon = wgsLon + dLon
+      return [gcjLon, gcjLat]
+    },
+
+    openDevicePanel () {
+      if (!this.remoteId) {
+        alert('未获取到远端ID')
+        return
+      }
+      this.showDevicePanel = true
+    },
+
+    toggleFullScreen (e) {
+      const targetDom = document.querySelector('.screen-page')
+      if (!this.isFullScreen) {
+        targetDom.requestFullscreen().catch(err => {
+          console.warn('全屏开启失败', err)
+        })
+        this.isFullScreen = true
+      } else {
+        document.exitFullscreen()
+        this.isFullScreen = false
+      }
+      e.target.blur()
+    },
+
+    toggleDrawMode () {
+      this.drawPointMode = !this.drawPointMode
+      if (this.drawPointMode) {
+        alert('已开启点位配置，点击地图任意位置添加点位')
+      }
+    },
+
+    clearAllManualPoint () {
+      this.manualMarkers.forEach(marker => this.map.remove(marker))
+      this.manualMarkers = []
+      this.manualPointList = []
+    },
+
+    async initMap () {
+      try {
+        const initLng = 116.331644
+        const initLat = 40.043262
+        this.map = new window.AMap.Map('container', {
+          zoom: 12,
+          center: [initLng, initLat],
+          resizeEnable: true
+        })
+
+        const deviceIcon = new window.AMap.Icon({
+          size: new window.AMap.Size(48, 64),
+          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+          imageSize: new window.AMap.Size(48, 64)
+        })
+
+        this.marker = new window.AMap.Marker({
+          position: [initLng, initLat],
+          icon: deviceIcon
+        })
+        this.map.add(this.marker)
+
+        this.textLabel = new window.AMap.Text({
+          position: [initLng, initLat],
+          text: 'DEMO',
+          offset: new window.AMap.Pixel(16, -45),
+          style: {
+            color: '#00ff66',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            textShadow: '0 0 3px #000, 0 0 8px #00ff66, 0 0 12px #00ff66',
+            background: 'transparent',
+            border: 'none',
+            whiteSpace: 'nowrap'
+          }
+        })
+        this.map.add(this.textLabel)
+
+        this.marker.on('moving', (e) => {
+          this.textLabel.setPosition(e.lnglat)
+        })
+        this.marker.on('dblclick', () => {
+          this.openDevicePanel()
+        })
+
+        this.map.on('click', (e) => {
+          if (!this.drawPointMode) return
+          const rawLng = e.lnglat.lng
+          const rawLat = e.lnglat.lat
+          const pointInfo = {
+            lng: rawLng.toFixed(6),
+            lat: rawLat.toFixed(6),
+            wgsLng: this.gcj02ToWgs84(rawLng, rawLat)[0].toFixed(6),
+            wgsLat: this.gcj02ToWgs84(rawLng, rawLat)[1].toFixed(6)
+          }
+          this.addManualMarker(pointInfo)
+        })
+
+        this.map.on('dblclick', (e) => {
+          const lng = e.lnglat.lat
+          const lat = e.lnglat.lat
+          const [gcjL, gcjLa] = this.wgs84ToGcj02(lng, lat)
+          console.log('双击点位GCJ02:', gcjL, gcjLa)
+        })
+      } catch (err) {
+        console.warn('地图加载失败', err)
+      }
+    },
+
+    addManualMarker (pointInfo) {
+      const marker = new window.AMap.Marker({
+        position: [pointInfo.lng, pointInfo.lat],
+        icon: new window.AMap.Icon({
+          size: new window.AMap.Size(36, 48),
+          imageSize: new window.AMap.Size(36, 48),
+          image: 'https://a.amap.com/jsapi/static/image/plugin/marker_orange.png'
+        })
+      })
+      marker.on('click', () => {
+        const info = `GCJ02:${pointInfo.lng},${pointInfo.lat}\nWGS84:${pointInfo.wgsLng},${pointInfo.wgsLat}`
+        const win = new window.AMap.InfoWindow({
+          content: info
+        })
+        win.open(this.map, marker.getPosition())
+      })
+      this.map.add(marker)
+      this.manualMarkers.push(marker)
+      this.manualPointList.push(pointInfo)
+    },
+
+    removePoint (index) {
+      this.map.remove(this.manualMarkers[index])
+      this.manualMarkers.splice(index, 1)
+      this.manualPointList.splice(index, 1)
+    },
+
+    saveAllPoints () {
+      console.log('待保存点位集合', this.manualPointList)
+      alert(`共${this.manualPointList.length}个点位，已输出控制台，可对接保存接口`)
+    },
+
+    gcj02ToWgs84 (gcjLon, gcjLat) {
+      const PI = 3.1415926535897932384626
+      const a = 6378245.0
+      const ee = 0.00669342162296594323
+      const outOfChina = (lon, lat) => {
+        return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
+      }
+      if (outOfChina(gcjLon, gcjLat)) return [gcjLon, gcjLat]
+      const transformLat = (x, y) => {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+        ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+        ret += (160.0 * Math.sin(y / 12.0 * PI) + 320.0 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+        return ret
+      }
+      const transformLon = (x, y) => {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+        ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+        ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+        ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0)) * 2.0 / 3.0
+        return ret
+      }
+      let dLat = transformLat(gcjLon - 105.0, gcjLat - 35.0)
+      let dLon = transformLon(gcjLon - 105.0, gcjLat - 35.0)
+      const radLat = gcjLat / 180.0 * PI
+      const magic = Math.sin(radLat)
+      const magic2 = 1 - ee * magic * magic
+      const sqrtMagic = Math.sqrt(magic2)
+      dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic2 * sqrtMagic) * PI)
+      dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
+      const wgsLat = gcjLat - dLat
+      const wgsLon = gcjLon - dLon
+      return [wgsLon, wgsLat]
+    },
+
+    getHeightsWidths () {
+      var contentHeight = $(window).height() - 110
+      var menuHeight = $('.menubanner').outerHeight()
+      $('.content').height(contentHeight)
+      $('.orgTreeList').css('top', menuHeight)
+      $('.openTreeList').css('top', menuHeight)
+      if ($('.orgTreeList').hasClass('treeListShow')) {
+        var contentWidth = $(window).width()
+        var treeWidth = $('.orgTreeList').width()
+        $('.content').css('left', 0)
+        $('.content').width(contentWidth - treeWidth)
+        $('.screen-page').width(contentWidth - treeWidth)
+      } else {
+        var contentWidths = $(window).width()
+        $('.content').css('left', 0)
+        $('.content').width(contentWidths)
+        $('.screen-page').width(contentWidths)
+      }
+      this.$nextTick(() => {
+        if (this.$refs.chartLine) {
+          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+          if (chart) chart.resize()
+        }
+      })
+    },
+
+    updateTime () {
+      const date = new Date()
+      const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+      const w = week[date.getDay()]
+      const y = date.getFullYear()
+      const m = (date.getMonth() + 1).toString().padStart(2, '0')
+      const d = date.getDate().toString().padStart(2, '0')
+      const hh = date.getHours().toString().padStart(2, '0')
+      const mm = date.getMinutes().toString().padStart(2, '0')
+      const ss = date.getSeconds().toString().padStart(2, '0')
+      this.nowTime = `${w} ${y}-${m}-${d} ${hh}:${mm}:${ss}`
+    },
+
+    initLineChart () {
+      const myChart = echarts.init(this.$refs.chartLine)
+      myChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        grid: {
+          left: 25,
+          right: 25,
+          top: 15,
+          bottom: 45,
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          data: Array.from({ length: 20 }, (i) => (i + 1).toString())
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          max: 3
+        },
+        series: [
+          {
+            name: '电耗',
+            type: 'line',
+            smooth: true,
+            data: [2.5, 2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2]
+          }
+        ]
+      })
+    }
+  }
+}
+</script>
+<style scoped>
+/* 原有样式不变 */
+.screen-page {
+  height: 100%;
+  background: #0b1229!important;
+  color: #fff;
+  overflow: visible !important;
+  overflow-x: hidden !important;
+  display: flex!important;
+  flex-direction: column;
+  box-sizing: border-box !important;
+  width: 100%;
+}
+.top-bar {
+  width: 100%;
+  height: 40px;
+  background: linear-gradient(to right, #031c3e, #062a5c);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid #00ffff;
+  flex-shrink: 0;
+  box-sizing: border-box !important;
+}
+.top-left,
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.select {
+  background: #0b2a5a;
+  color: #fff;
+  border: 1px solid #00ffff;
+  padding: 4px 8px;
+}
+.btn {
+  background: #00ffff;
+  color: #000;
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.top-title {
+  font-size: 26px;
+  color: #00ffff;
+  font-weight: bold;
+}
+.time {
+  color: #00ffff;
+  margin-left: 10px;
+  font-size: 14px;
+}
+.content-screen {
+  flex: 1 !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  padding: 1px;
+  gap: 14px;
+  min-height: unset !important;
+  height: auto !important;
+  box-sizing: border-box;
+  width: 100% !important;
+}
+.left-box {
+  width: 18%;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.center-box {
+  flex: 1;
+  min-width: 0;
+}
+.right-box {
+  width: 19%;
+  min-width: 240px;
+  flex-shrink: 0;
+}
+
+.panel {
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  position: relative;
+  background-color: #0b1229!important;
+  flex: 1;
+}
+.m-top {
+  margin-top: 15px;
+}
+.panel-title {
+  text-align: center;
+  color: #00ffff;
+  font-size: 26px;
+  margin-bottom: 15px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 12px;
+  padding: 8px 12px;
+}
+.stat-card {
+  text-align: center;
+}
+.stat-card .num {
+  font-size: 36px;
+  color: #00ffff;
+  font-weight: bold;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(0,255,255,0.6);
+  font-family: "DS-Digital", "LED Digital", monospace;
+}
+.stat-card .unit {
+  font-size: 20px;
+  color: #00ffff;
+  margin: 4px 0;
+}
+.stat-card .label {
+  font-size: 22px;
+  color: #fff;
+  opacity: 0.9;
+}
+
+.date-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #fff;
+  padding: 0 12px;
+}
+.input-month {
+  background: #0b2a5a;
+  color: #fff;
+  border: 1px solid #00ffff;
+  padding: 4px 8px;
+  font-size: 16px;
+}
+.chart-title {
+  color: #ff9500;
+  font-size: 18px;
+  margin-bottom: 8px;
+  padding: 0 12px;
+}
+.chart {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 8px;
+}
+
+.map-panel {
+  padding: 0 !important;
+  height: 100% !important;
+  position: relative;
+}
+.map-box {
+  width: calc(100% - 20px) !important;
+  height: calc(100% - 10px) !important;
+  background: #08254a;
+  border: 1px solid #00ffff;
+  position: relative;
+  overflow: hidden;
+  margin: 5px auto !important;
+}
+
+/* 新增点位工具栏样式 */
+.map-tool-bar {
+  position: absolute;
+  top:10px;
+  left:10px;
+  z-index:999;
+  display:flex;
+  gap:8px;
+}
+.tool-btn {
+  background:#0a78ff;
+  color:#fff;
+  border:none;
+  padding:5px 10px;
+  border-radius:3px;
+}
+.tool-btn.active {
+  background:#ff7800;
+}
+.clear-btn {
+  background:#666;
+}
+.save-btn {
+  background:#00c48c;
+}
+
+/* 点位列表悬浮面板 */
+.map-point-list {
+  position: absolute;
+  top:60px;
+  left:10px;
+  background:rgba(0,0,0,0.75);
+  padding:10px;
+  border:1px solid #ff7800;
+  border-radius:4px;
+  z-index:998;
+  min-width:220px;
+}
+.list-title {
+  color:#ff7800;
+  font-weight:bold;
+  margin-bottom:8px;
+}
+.point-item {
+  display:flex;
+  justify-content:space-between;
+  color:#fff;
+  font-size:12px;
+  padding:3px 0;
+}
+.point-item button {
+  background:#f33;
+  border:none;
+  color:#fff;
+  font-size:10px;
+  padding:1px 4px;
+}
+
+.search-input {
+  width: calc(100% - 20px);
+  margin: 0 10px 12px 10px;
+  background: #0b2a5a;
+  color: #fff;
+  border: 1px solid #00ffff;
+  padding: 6px;
+  box-sizing: border-box;
+}
+.device-table {
+  width: calc(100% - 20px);
+  margin: 0 10px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.device-table th,
+.device-table td {
+  border: 1px solid #00ffff;
+  padding: 8px;
+  text-align: center;
+}
+.device-table th {
+  background: #023a70;
+  color: #00ffff;
+}
+.offline {
+  color: #ff2a2a;
+  font-weight: bold;
+}
+.online {
+  color: #00ff66;
+}
+
+.screen-full {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  overflow: hidden !important;
+}
+.screen-full .content-screen {
+  height: calc(100% - 60px) !important;
+  padding-bottom: 15px !important;
+}
+::v-deep .dv-border-box-1.panel {
+  height: 100% !important;
+  position: relative !important;
+}
+.panel-title {
+  position: relative;
+  z-index: 2;
+}
+.stat-grid {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 12px;
+  padding: 8px 12px;
+  align-items: center;
+}
+
+::v-deep .dv-border-box-1.panel.m-top {
+  height: 100% !important;
+  position: relative !important;
+}
+.m-top .panel-title,
+.m-top .date-box,
+.m-top .chart-title {
+  position: relative;
+  z-index: 2;
+}
+.m-top .chart {
+  position: absolute;
+  top: 130px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto !important;
+}
+
+@media screen and (max-width: 1366px) {
+  ::v-deep .dv-border-box-1.panel {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  ::v-deep .dv-border-box-1 .border-box-content {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .panel-title {
+    flex-shrink: 0 !important;
+    font-size: 20px !important;
+    margin-bottom: 8px !important;
+  }
+  .stat-grid {
+    position: static !important;
+    flex: 1 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px 8px !important;
+    padding: 6px 8px !important;
+  }
+  .stat-card .num {
+    font-size: 26px !important;
+  }
+  .stat-card .unit {
+    font-size: 14px !important;
+  }
+  .stat-card .label {
+    font-size: 16px !important;
+  }
+  .m-top .chart {
+    position: static !important;
+    flex: 1 !important;
+    height: 120px !important;
+    min-height: 120px !important;
+  }
+}
+.panel.m-top {
+  min-height: 220px !important;
+}
+@media screen and (min-width: 1367px) {
+  .m-top .chart {
+    position: absolute;
+    top: 130px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+}
+</style>

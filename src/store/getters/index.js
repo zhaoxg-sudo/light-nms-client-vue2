@@ -13,6 +13,9 @@ export default {
   TreeData: state => {
     return state.TreeData
   },
+  updatePoint: state => {
+    return state.updatePoint
+  },
   alarmReport: state => {
     return state.alarmReport
   },

@@ -362,7 +362,8 @@ export default {
   computed: {
     ...mapGetters({
       get_user_info: GET_USER_INFO,
-      TreeData: 'TreeData'
+      TreeData: 'TreeData',
+      updatePoint: 'updatePoint'
     }),
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
@@ -400,6 +401,16 @@ export default {
         })
       },
       deep: true
+    },
+    'updatePoint': {
+      handler: async function (data) {
+        console.log('[screen] updatePoint:=', data)
+
+        this.$nextTick(async function () {
+          // 直接调用set map point方法，传入设备ID
+          this.updateMapPointByID(data)
+        })
+      }
     }
   },
   created () {
@@ -441,38 +452,43 @@ export default {
           console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
           return
         }
-
+        // 发送 state,update map point
+        this.$store.dispatch('updatePoint', {
+          cid: rawGpsData.cid,
+          gcjLng,
+          gcjLat
+        })
         // 根据cid查找点位数组下标
-        const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === rawGpsData.cid.trim())
-        if (targetIndex === -1) {
-          console.warn('未匹配到该点位ID：', rawGpsData.cid)
-          return
-        }
-        const currPoint = this.dbGreenMarkers[targetIndex]
+        // const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === rawGpsData.cid.trim())
+        // if (targetIndex === -1) {
+        //   console.warn('未匹配到该点位ID：', rawGpsData.cid)
+        //   return
+        // }
+        // const currPoint = this.dbGreenMarkers[targetIndex]
 
-        // 校验marker正常挂载地图
-        if (!currPoint.marker || !currPoint.marker.getMap()) {
-          console.warn('Marker脱离地图，无法更新')
-          return
-        }
+        // // 校验marker正常挂载地图
+        // if (!currPoint.marker || !currPoint.marker.getMap()) {
+        //   console.warn('Marker脱离地图，无法更新')
+        //   return
+        // }
 
-        // 1、高德原生API 立即切换绿色在线图标
-        currPoint.marker.setIcon(currPoint.greenIcon)
-        // currPoint.marker.setZIndex(99)
-        // 更新点位坐标
-        currPoint.marker.setPosition([gcjLng, gcjLat])
-        if (currPoint.label) currPoint.label.setPosition([gcjLng, gcjLat])
+        // // 1、高德原生API 立即切换绿色在线图标
+        // currPoint.marker.setIcon(currPoint.greenIcon)
+        // // currPoint.marker.setZIndex(99)
+        // // 更新点位坐标
+        // currPoint.marker.setPosition([gcjLng, gcjLat])
+        // if (currPoint.label) currPoint.label.setPosition([gcjLng, gcjLat])
 
-        // 2、Vue响应式更新在线状态，右侧表格同步刷新
-        this.$set(currPoint, 'online', true)
-        // 保存最新经纬度
-        currPoint.gcjLng = gcjLng
-        currPoint.gcjLat = gcjLat
+        // // 2、Vue响应式更新在线状态，右侧表格同步刷新
+        // this.$set(currPoint, 'online', true)
+        // // 保存最新经纬度
+        // currPoint.gcjLng = gcjLng
+        // currPoint.gcjLat = gcjLat
 
-        // 3、重建数组引用，强制computed列表刷新
-        this.dbGreenMarkers = [...this.dbGreenMarkers]
+        // // 3、重建数组引用，强制computed列表刷新
+        // this.dbGreenMarkers = [...this.dbGreenMarkers]
 
-        console.log('✅ 在线状态同步完成：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
+        // console.log('✅ 在线状态同步完成：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
       })
 
       window.globalGpsSubscribed = true
@@ -482,8 +498,7 @@ export default {
   mounted () {
     // 全局挂载当前Vue实例，供弹窗按钮调用openDevicePanel
     window.vueInstance = this
-    // 挂载Vue组件实例到全局
-    window.vueInstance = this
+
     // 全局封装打开设备面板方法，供弹窗按钮调用
     window.callOpenPanel = (deviceId) => {
       window.vueInstance.openDevicePanel(deviceId)
@@ -556,6 +571,8 @@ export default {
           // 高德地图重绘：双重校验实例+resize方法是否存在
           if (this.map && typeof this.map.resize === 'function') {
             this.map.resize()
+          } else {
+            this.showTip('地图刷新失败')
           }
         }
         // Echarts能耗图表重绘
@@ -613,8 +630,9 @@ export default {
     },
     openDevicePanel (id) {
       // 根据传入的设备ID，从点位数组查找当前设备信息
+      console.log('点击时的点位数组', this.dbGreenMarkers)
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
-
+      console.log('点击时发现的点位变量', deviceItem)
       // 判定条件：存在点位 并且 设备在线
       if (deviceItem && deviceItem.online === true) {
         // 赋值远端ID，打开面板弹窗
@@ -1177,7 +1195,40 @@ export default {
         this.centerLabel = null
       }
     },
+    // update map point
+    updateMapPointByID (data) {
+      // 根据cid查找点位数组下标
+      const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
+      if (targetIndex === -1) {
+        console.warn('未匹配到该点位ID：', data.cid)
+        return
+      }
+      const currPoint = this.dbGreenMarkers[targetIndex]
 
+      // 校验marker正常挂载地图
+      if (!currPoint.marker || !currPoint.marker.getMap()) {
+        console.warn('Marker脱离地图，无法更新')
+        return
+      }
+
+      // 1、高德原生API 立即切换绿色在线图标
+      currPoint.marker.setIcon(currPoint.greenIcon)
+      // currPoint.marker.setZIndex(99)
+      // 更新点位坐标
+      currPoint.marker.setPosition([data.gcjLng, data.gcjLat])
+      if (currPoint.label) currPoint.label.setPosition([data.gcjLng, data.gcjLat])
+
+      // 2、Vue响应式更新在线状态，右侧表格同步刷新
+      this.$set(currPoint, 'online', true)
+      // 保存最新经纬度
+      currPoint.gcjLng = data.gcjLng
+      currPoint.gcjLat = data.gcjLat
+
+      // 3、重建数组引用，强制computed列表刷新
+      this.dbGreenMarkers = [...this.dbGreenMarkers]
+
+      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
+    },
     // 定位到中心点（按钮调用）
     locateCenterMarker () {
       if (!this.centerMarker) {

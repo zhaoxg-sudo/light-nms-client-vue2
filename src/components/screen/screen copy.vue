@@ -561,8 +561,9 @@ export default {
     },
     openDevicePanel (id) {
       // 根据传入的设备ID，从点位数组查找当前设备信息
+      console("点击时的点位数组", this.dbGreenMarkers)
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
-
+      console("点击时发现的点位变量", deviceItem)
       // 判定条件：存在点位 并且 设备在线
       if (deviceItem && deviceItem.online === true) {
         // 赋值远端ID，打开面板弹窗

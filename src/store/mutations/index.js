@@ -17,6 +17,9 @@ export default {
     state.TreeData = val.data
     state.TreeObj = val.node
   },
+  UPDATEPOINT (state, val) {
+    state.updatePoint = val
+  },
   ALARMREPORT (state, val) {
     state.alarmReport = val
   },
