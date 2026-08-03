@@ -75,6 +75,45 @@
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
           <div id="container" class="map-box">
+            <!-- ========== 新增：地图顶部居中搜索框 ========== -->
+            <div class="map-search-wrap">
+              <el-input
+                v-model="searchKey"
+                placeholder="搜索设备ID/名称 | 地址地点"
+                clearable
+                prefix-icon="el-icon-search"
+                @input="handleSearch"
+                @focus="showDropdown = true"
+                @blur="hideDropdownTimer"
+              ></el-input>
+              <!-- 下拉结果面板 -->
+              <div v-if="showDropdown && totalResult.length" class="search-dropdown-panel">
+                <!-- 匹配到的设备分组 -->
+                <div v-if="matchDeviceList.length" class="dropdown-group-title">设备点位</div>
+                <div
+                  v-for="dev in matchDeviceList"
+                  :key="dev.id"
+                  class="dropdown-item device-item"
+                  @click="selectDeviceItem(dev)"
+                >
+                  <div class="item-name">{{ dev.name || '未命名点位' }}</div>
+                  <div class="item-desc">ID：{{ dev.id }}｜{{ dev.online ? '在线' : '离线' }}</div>
+                </div>
+
+                <!-- 高德地址搜索分组 -->
+                <div v-if="matchPoiList.length" class="dropdown-group-title">地理位置</div>
+                <div
+                  v-for="poi in matchPoiList"
+                  :key="poi.id"
+                  class="dropdown-item poi-item"
+                  @click="selectPoiItem(poi)"
+                >
+                  <div class="item-name">{{ poi.name }}</div>
+                  <div class="item-desc">{{ poi.district }}{{ poi.address }}</div>
+                </div>
+              </div>
+            </div>
+            <!-- ============================================== -->
            <!-- 1、上方：地图中心点 -->
           <div style="position:absolute;top:60px;right:14px;z-index:1002;">
             <button class="map-top-btn" @click="goDefaultCenter" title="定位到地图中心点">
@@ -306,6 +345,15 @@ export default {
       showTipModal: false,
       tipText: '',
       onlyMapMode: false, // 纯地图模式开关
+      // ========== 新增搜索变量 ==========
+      searchKey: '',
+      showDropdown: false,
+      placeSearch: null, // 高德地点搜索实例
+      matchDeviceList: [], // 匹配设备结果
+      matchPoiList: [], // 高德地址结果
+      totalResult: [], // 合并总结果（控制下拉显示）
+      dropdownTimer: null, // 失焦延时关闭定时器
+
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -314,7 +362,8 @@ export default {
   computed: {
     ...mapGetters({
       get_user_info: GET_USER_INFO,
-      TreeData: 'TreeData'
+      TreeData: 'TreeData',
+      updatePoint: 'updatePoint'
     }),
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
@@ -352,6 +401,16 @@ export default {
         })
       },
       deep: true
+    },
+    'updatePoint': {
+      handler: async function (data) {
+        console.log('[screen] updatePoint:=', data)
+
+        this.$nextTick(async function () {
+          // 直接调用set map point方法，传入设备ID
+          this.updateMapPointByID(data)
+        })
+      }
     }
   },
   created () {
@@ -393,38 +452,43 @@ export default {
           console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
           return
         }
-
+        // 发送 state,update map point
+        this.$store.dispatch('updatePoint', {
+          cid: rawGpsData.cid,
+          gcjLng,
+          gcjLat
+        })
         // 根据cid查找点位数组下标
-        const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === rawGpsData.cid.trim())
-        if (targetIndex === -1) {
-          console.warn('未匹配到该点位ID：', rawGpsData.cid)
-          return
-        }
-        const currPoint = this.dbGreenMarkers[targetIndex]
+        // const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === rawGpsData.cid.trim())
+        // if (targetIndex === -1) {
+        //   console.warn('未匹配到该点位ID：', rawGpsData.cid)
+        //   return
+        // }
+        // const currPoint = this.dbGreenMarkers[targetIndex]
 
-        // 校验marker正常挂载地图
-        if (!currPoint.marker || !currPoint.marker.getMap()) {
-          console.warn('Marker脱离地图，无法更新')
-          return
-        }
+        // // 校验marker正常挂载地图
+        // if (!currPoint.marker || !currPoint.marker.getMap()) {
+        //   console.warn('Marker脱离地图，无法更新')
+        //   return
+        // }
 
-        // 1、高德原生API 立即切换绿色在线图标
-        currPoint.marker.setIcon(currPoint.greenIcon)
-        // currPoint.marker.setZIndex(99)
-        // 更新点位坐标
-        currPoint.marker.setPosition([gcjLng, gcjLat])
-        if (currPoint.label) currPoint.label.setPosition([gcjLng, gcjLat])
+        // // 1、高德原生API 立即切换绿色在线图标
+        // currPoint.marker.setIcon(currPoint.greenIcon)
+        // // currPoint.marker.setZIndex(99)
+        // // 更新点位坐标
+        // currPoint.marker.setPosition([gcjLng, gcjLat])
+        // if (currPoint.label) currPoint.label.setPosition([gcjLng, gcjLat])
 
-        // 2、Vue响应式更新在线状态，右侧表格同步刷新
-        this.$set(currPoint, 'online', true)
-        // 保存最新经纬度
-        currPoint.gcjLng = gcjLng
-        currPoint.gcjLat = gcjLat
+        // // 2、Vue响应式更新在线状态，右侧表格同步刷新
+        // this.$set(currPoint, 'online', true)
+        // // 保存最新经纬度
+        // currPoint.gcjLng = gcjLng
+        // currPoint.gcjLat = gcjLat
 
-        // 3、重建数组引用，强制computed列表刷新
-        this.dbGreenMarkers = [...this.dbGreenMarkers]
+        // // 3、重建数组引用，强制computed列表刷新
+        // this.dbGreenMarkers = [...this.dbGreenMarkers]
 
-        console.log('✅ 在线状态同步完成：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
+        // console.log('✅ 在线状态同步完成：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
       })
 
       window.globalGpsSubscribed = true
@@ -434,8 +498,7 @@ export default {
   mounted () {
     // 全局挂载当前Vue实例，供弹窗按钮调用openDevicePanel
     window.vueInstance = this
-    // 挂载Vue组件实例到全局
-    window.vueInstance = this
+
     // 全局封装打开设备面板方法，供弹窗按钮调用
     window.callOpenPanel = (deviceId) => {
       window.vueInstance.openDevicePanel(deviceId)
@@ -504,7 +567,13 @@ export default {
       this.$nextTick(() => {
         // 高德地图重绘
         if (this.map) {
-          this.map.resize()
+          // this.map.resize()
+          // 高德地图重绘：双重校验实例+resize方法是否存在
+          if (this.map && typeof this.map.resize === 'function') {
+            this.map.resize()
+          } else {
+            this.showTip('地图刷新失败')
+          }
         }
         // Echarts能耗图表重绘
         if (this.$refs.chartLine) {
@@ -561,9 +630,9 @@ export default {
     },
     openDevicePanel (id) {
       // 根据传入的设备ID，从点位数组查找当前设备信息
-      console("点击时的点位数组", this.dbGreenMarkers)
+      console.log('点击时的点位数组', this.dbGreenMarkers)
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
-      console("点击时发现的点位变量", deviceItem)
+      console.log('点击时发现的点位变量', deviceItem)
       // 判定条件：存在点位 并且 设备在线
       if (deviceItem && deviceItem.online === true) {
         // 赋值远端ID，打开面板弹窗
@@ -636,6 +705,27 @@ export default {
           zoom: 12,
           center: [initLng, initLat],
           resizeEnable: true
+        })
+        // ====== 新增：手动创建工具栏控件（包含搜索框）======
+        window.AMap.plugin(['AMap.ToolBar', 'AMap.PlaceSearch'], () => {
+          // 实例化工具栏，开启内置搜索输入框
+          const toolBar = new window.AMap.ToolBar({
+            // position: {
+            //   left: '10px',
+            //   top: '40px'
+            // },
+            position: 'LT',
+            searchBar: true, // 开启地图原生搜索框
+            autoShow: true
+          })
+          // 把控件添加到地图
+          this.map.addControl(toolBar)
+
+          // 你的地点搜索实例保持原有代码不变
+          this.placeSearch = new window.AMap.PlaceSearch({
+            city: '北京',
+            pageSize: 8
+          })
         })
 
         // ========== 移除原固定单个DEMO marker代码，改为动态读取数据库点位 ==========
@@ -786,31 +876,6 @@ export default {
             grayIcon
           })
 
-          // // 鼠标移入点位：清除关闭倒计时，打开弹窗
-          // marker.on('mouseover', () => {
-          //   clearTimeout(globalHoverTimer)
-          //   mainInfoWin.open(this.map, marker.getPosition())
-          // })
-
-          // // 鼠标移出点位：500毫秒延时关闭弹窗，预留移动鼠标缓冲时间
-          // marker.on('mouseout', () => {
-          //   globalHoverTimer = setTimeout(() => {
-          //     mainInfoWin.close()
-          //   }, 500)
-          // })
-
-          // // 弹窗打开后，绑定弹窗内部鼠标移入移出事件（核心解决按钮点击失效）
-          // mainInfoWin.on('open', () => {
-          //   const winDom = mainInfoWin.getContentDom()
-          //   // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
-          //   winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
-          //   // 鼠标离开弹窗：重新开启延时关闭
-          //   winDom.onmouseleave = () => {
-          //     globalHoverTimer = setTimeout(() => {
-          //       mainInfoWin.close()
-          //     }, 500)
-          //   }
-          // })
           // 鼠标移入点位：清除关闭倒计时，打开弹窗
           marker.on('mouseover', () => {
             clearTimeout(globalHoverTimer)
@@ -1130,7 +1195,40 @@ export default {
         this.centerLabel = null
       }
     },
+    // update map point
+    updateMapPointByID (data) {
+      // 根据cid查找点位数组下标
+      const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
+      if (targetIndex === -1) {
+        console.warn('未匹配到该点位ID：', data.cid)
+        return
+      }
+      const currPoint = this.dbGreenMarkers[targetIndex]
 
+      // 校验marker正常挂载地图
+      if (!currPoint.marker || !currPoint.marker.getMap()) {
+        console.warn('Marker脱离地图，无法更新')
+        return
+      }
+
+      // 1、高德原生API 立即切换绿色在线图标
+      currPoint.marker.setIcon(currPoint.greenIcon)
+      // currPoint.marker.setZIndex(99)
+      // 更新点位坐标
+      currPoint.marker.setPosition([data.gcjLng, data.gcjLat])
+      if (currPoint.label) currPoint.label.setPosition([data.gcjLng, data.gcjLat])
+
+      // 2、Vue响应式更新在线状态，右侧表格同步刷新
+      this.$set(currPoint, 'online', true)
+      // 保存最新经纬度
+      currPoint.gcjLng = data.gcjLng
+      currPoint.gcjLat = data.gcjLat
+
+      // 3、重建数组引用，强制computed列表刷新
+      this.dbGreenMarkers = [...this.dbGreenMarkers]
+
+      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
+    },
     // 定位到中心点（按钮调用）
     locateCenterMarker () {
       if (!this.centerMarker) {
@@ -1139,6 +1237,64 @@ export default {
       }
       const pos = this.centerMarker.getPosition()
       this.map.setZoomAndCenter(16, [pos.lng, pos.lat])
+    },
+    // ========== 新增搜索全套方法 ==========
+    // 输入关键词执行搜索：优先级 设备 > 高德地址
+    handleSearch () {
+      const keyword = this.searchKey.trim().toLowerCase()
+      // 清空所有结果
+      this.matchDeviceList = []
+      this.matchPoiList = []
+      this.totalResult = []
+      clearTimeout(this.dropdownTimer)
+
+      if (!keyword) {
+        this.showDropdown = false
+        return
+      }
+
+      // 第一步：优先模糊检索本地设备（ID、点位名称）
+      this.matchDeviceList = this.dbGreenMarkers.filter(item => {
+        const name = String(item.name || '').toLowerCase()
+        const id = String(item.id).toLowerCase()
+        return name.includes(keyword) || id.includes(keyword)
+      })
+
+      // 第二步：无设备匹配，再调用高德搜索地理位置
+      if (this.matchDeviceList.length === 0 && this.placeSearch) {
+        this.placeSearch.search(keyword, (status, res) => {
+          if (status === 'complete' && res.poiList.pois.length) {
+            this.matchPoiList = res.poiList.pois
+          }
+          this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
+        })
+      } else {
+        // 有设备结果，不需要请求高德
+        this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
+      }
+    },
+
+    // 选中设备：地图居中定位点位
+    selectDeviceItem (device) {
+      this.searchKey = device.name || device.id
+      this.showDropdown = false
+      // 调用原有点击行定位方法，复用现有逻辑
+      this.handleClickRow(device.id)
+    },
+
+    // 选中高德地址：地图定位到地理坐标
+    selectPoiItem (poi) {
+      this.searchKey = poi.name
+      this.showDropdown = false
+      const [lng, lat] = poi.location.split(',')
+      this.map.setZoomAndCenter(15, [Number(lng), Number(lat)])
+    },
+
+    // 输入框失焦，延时关闭下拉（防止点击列表直接消失）
+    hideDropdownTimer () {
+      this.dropdownTimer = setTimeout(() => {
+        this.showDropdown = false
+      }, 220)
     },
 
     getHeightsWidths () {
@@ -1457,7 +1613,7 @@ export default {
 /* ====== 仅追加点位相关样式（不改动原有左侧布局！）====== */
 .map-tool-bar {
   position: absolute;
-  top: 10px;
+  top: 10px !important;  /* 10px → 20px，整体向下偏移10px，和顶部搜索框纵向对齐更协调 */
   left: 10px;
   z-index: 999;
   display: flex;
@@ -1659,6 +1815,98 @@ export default {
   border: none;
   border-radius: 3px;
   cursor: pointer;
+}
+/* ========== 地图搜索框自定义样式【已修改：对齐右侧map-top-btn蓝色按钮样式】 ========== */
+.map-search-wrap {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px; /* 改动：宽度由460px → 420px */
+  z-index: 1005;
+}
+/* Vue2 scoped必须 /deep/ 穿透ElementUI内部DOM */
+/deep/ .map-search-wrap .el-input__inner {
+  height: 36px; /* 改动：高度42px → 36px 和按钮等高 */
+  line-height: 36px; /* 新增：文字垂直居中 */
+  background-color: #0a78ff; /* 改动：半透明深蓝 → 按钮纯色蓝底色 */
+  border: none; /* 改动：取消青蓝色边框 */
+  border-radius: 3px; /* 改动：圆角8px → 3px 和按钮圆角一致 */
+  color: #ffffff;
+  font-size: 14px; /* 改动：字号15px→14px */
+  padding-left: 42px; /* 新增：左侧留白放搜索图标 */
+  padding-right: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 改动：阴影替换为按钮同款阴影 */
+  transition: background-color 0.2s ease; /* 新增：背景色过渡动画 */
+}
+/* 搜索前置图标变白 */
+/deep/ .map-search-wrap .el-input__prefix {
+  color: #fff;
+  left: 14px;
+}
+/* 占位符文字半透明白色 */
+/deep/ .map-search-wrap .el-input__inner::placeholder {
+  color: rgba(255, 255, 255, 0.72);
+}
+/* 悬浮hover效果 同按钮 */
+/deep/ .map-search-wrap .el-input__inner:hover {
+  background-color: #0767dd;
+}
+/* 输入框聚焦样式 */
+/deep/ .map-search-wrap .el-input__inner:focus {
+  background-color: #065bc9;
+  box-shadow: 0 0 0 2px rgba(10, 120, 255, 0.35), 0 2px 6px rgba(0,0,0,0.45);
+}
+/* 清除浏览器默认聚焦轮廓 */
+/deep/ .map-search-wrap .el-input__inner:focus-visible {
+  outline: none;
+}
+/* 清空按钮颜色适配白色主题 */
+/deep/ .map-search-wrap .el-input__clear {
+  color: rgba(255,255,255,0.8);
+}
+/* 高德原生工具栏整体下移 */
+/deep/ .amap-toolbar {
+  top: 40px !important;
+  left: 16px !important;
+}
+/* 下拉结果面板：全部沿用原有样式，无任何修改 */
+.search-dropdown-panel {
+  margin-top: 6px;
+  background: rgba(11, 18, 41, 0.96);
+  border: 1px solid #00ffff;
+  border-radius: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.dropdown-group-title {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #00ffff;
+  background: rgba(0, 60, 120, 0.3);
+}
+.dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.dropdown-item:hover {
+  background: rgba(0, 255, 255, 0.15);
+}
+.item-name {
+  font-size: 14px;
+  color: #ffffff;
+}
+.item-desc {
+  font-size: 12px;
+  color: #99ccdd;
+  margin-top: 3px;
+}
+.device-item .item-name {
+  color: #00ff66;
+}
+.poi-item .item-name {
+  color: #00ffff;
 }
 
 </style>

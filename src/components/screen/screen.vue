@@ -85,6 +85,7 @@
                 @input="handleSearch"
                 @focus="showDropdown = true"
                 @blur="hideDropdownTimer"
+                @mousedown.prevent
               ></el-input>
               <!-- 下拉结果面板 -->
               <div v-if="showDropdown && totalResult.length" class="search-dropdown-panel">
@@ -710,12 +711,8 @@ export default {
         window.AMap.plugin(['AMap.ToolBar', 'AMap.PlaceSearch'], () => {
           // 实例化工具栏，开启内置搜索输入框
           const toolBar = new window.AMap.ToolBar({
-            // position: {
-            //   left: '10px',
-            //   top: '40px'
-            // },
             position: 'LT',
-            searchBar: true, // 开启地图原生搜索框
+            searchBar: false, // 开启地图原生搜索框
             autoShow: true
           })
           // 把控件添加到地图
@@ -727,7 +724,6 @@ export default {
             pageSize: 8
           })
         })
-
         // ========== 移除原固定单个DEMO marker代码，改为动态读取数据库点位 ==========
         // 绿色图标样式保持原样
         const deviceIcon = new window.AMap.Icon({
@@ -1164,21 +1160,6 @@ export default {
         zIndex: 999,
         title: '地图中心点' // ✅ 鼠标悬浮内置tooltip
       })
-      // this.centerLabel = new window.AMap.Text({
-      //   position: pos,
-      //   text: name,
-      //   offset: new window.AMap.Pixel(0, -60),
-      //   style: {
-      //     color: '#ffffff', // 纯白色文字，对比度拉满
-      //     fontSize: '16px', // 字号放大2px
-      //     fontWeight: 'bold', // 加粗更清晰
-      //     background: 'rgba(0,0,0,0.85)', // 加深黑色背景，遮挡地图底色
-      //     padding: '3px 8px', // 增加内边距，文字不贴边框
-      //     borderRadius: '4px',
-      //     whiteSpace: 'nowrap',
-      //     textShadow: '0 0 4px #000' // 文字描边防融合
-      //   }
-      // })
       this.centerLabel = null
       this.map.add(this.centerMarker)
       // this.map.add(this.centerLabel)
@@ -1247,7 +1228,7 @@ export default {
       this.matchPoiList = []
       this.totalResult = []
       clearTimeout(this.dropdownTimer)
-
+      this.showDropdown = true
       if (!keyword) {
         this.showDropdown = false
         return
