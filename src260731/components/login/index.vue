@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import $ from 'jquery'
+// import $ from 'jquery'
 import {mapActions} from 'vuex'
 import {SET_USER_INFO} from '@/store/actions/type.js'
 export default {
@@ -65,10 +65,10 @@ export default {
   created () {
     this.$nextTick(function () {
       if (!window.ActiveXObject && !!document.createElement('canvas').getContext) {
-        $.getScript('/static/cav.js',
-          function () {
-            $.getScript('/static/getStart.js')
-          })
+        // $.getScript('/static/cav.js',
+        //   function () {
+        //     $.getScript('/static/getStart.js')
+        //   })
       }
     })
   },

@@ -47,23 +47,44 @@ export default {
     ...mapActions({
       set_user_info: SET_USER_INFO
     }),
-    logout () {
-      this.$confirm('此操作将退出登录, 是否继续?', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        cancelButtonClass: 'el-button--primary',
-        type: 'warning'
-      }).then(() => {
+    // logout () {
+    //   this.$confirm('此操作将退出登录, 是否继续?', '提示', {
+    //     confirmButtonText: '确定',
+    //     cancelButtonText: '取消',
+    //     cancelButtonClass: 'el-button--primary',
+    //     type: 'warning'
+    //   }).then(() => {
+    //     this.$message.success('退出成功')
+    //     this.set_user_info({
+    //       user: null,
+    //       powerData: null,
+    //       login: false
+    //     })
+    //     setTimeout(this.$router.replace({name: 'login'}), 500)
+    //   }).catch(() => {
+    //     this.$message.success('退出取消')
+    //   })
+    // },
+    async logout () {
+      try {
+        await this.$confirm('此操作将退出登录, 是否继续?', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          cancelButtonClass: 'el-button--primary',
+          type: 'warning'
+        })
         this.$message.success('退出成功')
         this.set_user_info({
           user: null,
           powerData: null,
           login: false
         })
-        setTimeout(this.$router.replace({name: 'login'}), 500)
-      }).catch(() => {
-        this.$message.success('退出取消')
-      })
+        setTimeout(() => {
+          this.$router.replace({name: 'login'})
+        }, 500)
+      } catch (error) { // ✅补充形参 error
+        this.$message.info('退出取消') // ✅修正提示类型
+      }
     },
     setting () {
       this.$router.push('/setting')
