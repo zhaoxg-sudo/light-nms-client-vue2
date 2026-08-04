@@ -74,7 +74,7 @@
       <!-- 中间地图 -->
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
-          <div id="container" class="map-box">
+          <div id="container" class="map-box" @click="closeSearchDropdown">
             <!-- ========== 新增：地图顶部居中搜索框 ========== -->
             <div class="map-search-wrap">
               <el-input
@@ -83,7 +83,7 @@
                 clearable
                 prefix-icon="el-icon-search"
                 @input="handleSearch"
-                @focus="showDropdown = true"
+                @focus="onSearchFocus"
                 @blur="hideDropdownTimer"
                 @mousedown.prevent
               ></el-input>
@@ -562,29 +562,55 @@ export default {
       window.location.reload()
     },
     // 切换纯地图模式：隐藏左右栏，只留地图
+    // switchOnlyMap () {
+    //   this.onlyMapMode = !this.onlyMapMode
+    //   // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
+    //   this.$nextTick(() => {
+    //     // 高德地图重绘
+    //     if (this.map) {
+    //       // this.map.resize()
+    //       // 高德地图重绘：双重校验实例+resize方法是否存在
+    //       if (this.map && typeof this.map.resize === 'function') {
+    //         this.map.resize()
+    //       } else {
+    //         this.showTip('地图刷新失败')
+    //       }
+    //     }
+    //     // Echarts能耗图表重绘
+    //     if (this.$refs.chartLine) {
+    //       const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+    //       if (chart) chart.resize()
+    //     }
+    //     // 重新计算页面高度宽度
+    //     this.getHeightsWidths()
+    //   })
+    // },
     switchOnlyMap () {
       this.onlyMapMode = !this.onlyMapMode
-      // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
       this.$nextTick(() => {
-        // 高德地图重绘
-        if (this.map) {
-          // this.map.resize()
-          // 高德地图重绘：双重校验实例+resize方法是否存在
+        setTimeout(() => {
+          // 高德地图重绘
           if (this.map && typeof this.map.resize === 'function') {
             this.map.resize()
           } else {
-            this.showTip('地图刷新失败')
+            // 短暂等待，重试一次，不立即弹窗
+            setTimeout(() => {
+              if (this.map && typeof this.map.resize === 'function') {
+                this.map.resize()
+              }
+              // 彻底删除无条件弹出“刷新失败”，避免时序误告警
+            }, 80)
           }
-        }
-        // Echarts能耗图表重绘
-        if (this.$refs.chartLine) {
-          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-          if (chart) chart.resize()
-        }
-        // 重新计算页面高度宽度
-        this.getHeightsWidths()
+
+          // Echarts能耗图表重绘
+          if (this.$refs.chartLine) {
+            const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+            if (chart) chart.resize()
+          }
+        }, 150)
       })
     },
+
     // 自定义提示弹窗，替代原生this.showTip
     showTip (msg) {
       this.tipText = msg
@@ -1220,6 +1246,14 @@ export default {
       this.map.setZoomAndCenter(16, [pos.lng, pos.lat])
     },
     // ========== 新增搜索全套方法 ==========
+    // 【新增】输入框获取焦点
+    onSearchFocus () {
+      this.showDropdown = true
+      // 如果框内存在文字，立刻重新检索，刷新下拉列表
+      if (this.searchKey.trim()) {
+        this.handleSearch()
+      }
+    },
     // 输入关键词执行搜索：优先级 设备 > 高德地址
     handleSearch () {
       const keyword = this.searchKey.trim().toLowerCase()
@@ -1254,11 +1288,25 @@ export default {
         this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
       }
     },
+    // 地图空白点击，关闭搜索下拉
+    closeSearchDropdown (e) {
+      // 获取搜索框外层dom
+      const searchDom = document.querySelector('.map-search-wrap')
+      // 如果点击落在搜索框/下拉内部 → 直接return，不关闭
+      if (searchDom && searchDom.contains(e.target)) {
+        return
+      }
+      this.showDropdown = false
+    },
 
     // 选中设备：地图居中定位点位
     selectDeviceItem (device) {
       this.searchKey = device.name || device.id
       this.showDropdown = false
+      // ============【关键新增】重新执行检索，缓存最新筛选条件============
+      this.$nextTick(() => {
+        this.handleSearch()
+      })
       // 调用原有点击行定位方法，复用现有逻辑
       this.handleClickRow(device.id)
     },

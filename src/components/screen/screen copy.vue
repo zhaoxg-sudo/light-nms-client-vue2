@@ -561,25 +561,52 @@ export default {
       window.location.reload()
     },
     // 切换纯地图模式：隐藏左右栏，只留地图
+    // switchOnlyMap () {
+    //   this.onlyMapMode = !this.onlyMapMode
+    //   // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
+    //   this.$nextTick(() => {
+    //     // 高德地图重绘
+    //     if (this.map) {
+    //       // this.map.resize()
+    //       // 高德地图重绘：双重校验实例+resize方法是否存在
+    //       if (this.map && typeof this.map.resize === 'function') {
+    //         this.map.resize()
+    //       } else {
+    //         this.showTip('地图刷新失败')
+    //       }
+    //     }
+    //     // Echarts能耗图表重绘
+    //     if (this.$refs.chartLine) {
+    //       const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+    //       if (chart) chart.resize()
+    //     }
+    //     // 重新计算页面高度宽度
+    //     this.getHeightsWidths()
+    //   })
+    // },
     switchOnlyMap () {
       this.onlyMapMode = !this.onlyMapMode
-      // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
       this.$nextTick(() => {
-        // 高德地图重绘
-        if (this.map) {
-          // this.map.resize()
-          // 高德地图重绘：双重校验实例+resize方法是否存在
+        setTimeout(() => {
+          // 高德地图重绘
           if (this.map && typeof this.map.resize === 'function') {
             this.map.resize()
           } else {
-            this.showTip('地图刷新失败')
+            // 短暂等待，重试一次，不立即弹窗
+            setTimeout(() => {
+              if (this.map && typeof this.map.resize === 'function') {
+                this.map.resize()
+              }
+              // 彻底删除无条件弹出“刷新失败”，避免时序误告警
+            }, 80)
           }
-        }
-        // Echarts能耗图表重绘
-        if (this.$refs.chartLine) {
-          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-          if (chart) chart.resize()
-        }
+
+          // Echarts能耗图表重绘
+          if (this.$refs.chartLine) {
+            const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+            if (chart) chart.resize()
+          }
+        }, 150)
         // 重新计算页面高度宽度
         this.getHeightsWidths()
       })
