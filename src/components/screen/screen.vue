@@ -98,7 +98,13 @@
                   @click="selectDeviceItem(dev)"
                 >
                   <div class="item-name">{{ dev.name || '未命名点位' }}</div>
-                  <div class="item-desc">ID：{{ dev.id }}｜{{ dev.online ? '在线' : '离线' }}</div>
+                  <!-- <div class="item-desc">ID：{{ dev.id }}｜{{ dev.online ? '在线' : '离线' }}</div> -->
+                  <div class="item-desc">
+                    ID：{{ dev.id }}｜
+                    <span :style="{color: dev.online ? '#39ff5e' : '#ff4444'}">
+                      {{ dev.online ? '在线' : '离线' }}
+                    </span>
+                  </div>
                 </div>
 
                 <!-- 高德地址搜索分组 -->
