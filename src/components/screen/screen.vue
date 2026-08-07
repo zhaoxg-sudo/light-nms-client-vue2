@@ -411,7 +411,7 @@ export default {
     },
     'updatePoint': {
       handler: async function (data) {
-        console.log('[screen] updatePoint:=', data)
+        console.log('[screen] store->updatePoint:=', data)
 
         this.$nextTick(async function () {
           // 直接调用set map point方法，传入设备ID
@@ -433,42 +433,42 @@ export default {
     } else {
       this.userPermissions.push('device:read')
     }
-    if (window.globalGpsSubscribed) {
-      return
-    }
+    // if (window.globalGpsSubscribed) {
+    //   return
+    // }
 
-    if (this.sockets) {
-      this.sockets.subscribe('gps', (rawGpsData) => {
-        console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
-        // window.latestGpsData = rawGpsData
-        this.remoteId = rawGpsData.clientKey
-        this.deviceOnline = true
-        this.lastGps = rawGpsData
+    // if (this.sockets) {
+    //   this.sockets.subscribe('gps', (rawGpsData) => {
+    //     console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
+    //     // window.latestGpsData = rawGpsData
+    //     this.remoteId = rawGpsData.clientKey
+    //     this.deviceOnline = true
+    //     this.lastGps = rawGpsData
 
-        const rawLng = Number(rawGpsData.lng)
-        const rawLat = Number(rawGpsData.lat)
-        if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
-          console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
-          return
-        }
+    //     const rawLng = Number(rawGpsData.lng)
+    //     const rawLat = Number(rawGpsData.lat)
+    //     if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
+    //       console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
+    //       return
+    //     }
 
-        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
-        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+    //     const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
+    //     console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
 
-        if (isNaN(gcjLng) || isNaN(gcjLat)) {
-          console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
-          return
-        }
-        // 发送 state,update map point
-        this.$store.dispatch('updatePoint', {
-          cid: rawGpsData.cid,
-          gcjLng,
-          gcjLat
-        })
-      })
+    //     if (isNaN(gcjLng) || isNaN(gcjLat)) {
+    //       console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
+    //       return
+    //     }
+    //     // 发送 state,update map point
+    //     this.$store.dispatch('updatePoint', {
+    //       cid: rawGpsData.cid,
+    //       gcjLng,
+    //       gcjLat
+    //     })
+    //   })
 
-      window.globalGpsSubscribed = true
-    }
+    //   window.globalGpsSubscribed = true
+    // }
   },
 
   mounted () {
@@ -518,19 +518,68 @@ export default {
   beforeDestroy () {
     clearInterval(this.timer)
     this.destroyCenterMarker() // 销毁中心点标记
+    // 【修改1】清理全局resize监听
+    window.removeEventListener('resize', window.__screenResizeHandler)
+
+    // 【修改2】删除全局挂载引用，释放组件内存
+    delete window.__screenResizeHandler
+    delete window.vueInstance
+    delete window.callOpenPanel
+
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
     if (document.fullscreenElement) {
       document.exitFullscreen()
     }
-    if (this.map) {
+    if (this.map && typeof this.map.clear === 'function') {
+      // 【修改4】先清空地图覆盖物，再销毁实例
+      this.map.clear()
+      this.map.off()
       this.map.destroy()
+      this.map = null
     }
     window.currentMapInstance = null
     window.currentMapMarker = null
     window.currentMapText = null
   },
+  // ↓ 新增 deactivated ↓
+  deactivated () {
+    console.log('[screen] 路由离开/缓存失活，清理地图资源')
 
+    this.showDropdown = false
+
+    clearTimeout(this.dropdownTimer)
+
+    this.destroyCenterMarker()
+
+    if (this.map) {
+      this.map.clear()
+      this.map.off()
+    }
+
+    this.dbGreenMarkers = []
+    this.manualMarkers = []
+    this.manualPointList = []
+  },
+
+  // 新增 activated
+  activated () {
+    console.log('[screen] 切回大屏页面，重置地图状态')
+
+    this.$nextTick(() => {
+      setTimeout(() => {
+        if (this.map && typeof this.map.resize === 'function') {
+          this.map.resize()
+        }
+      }, 150)
+    })
+  },
+  // 每次切入路由强制刷新点位
+  beforeRouteEnter (to, from, next) {
+    next(async vm => {
+      // await vm.$store.dispatch('updatePoint')
+    })
+  },
   sockets: {},
   methods: {
     refreshAll () {
