@@ -21,16 +21,32 @@
             </div>
           </div>
         </div>
+         <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label class="col-sm-4 control-label">租户名</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" v-model="formData.fullname">
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="row">
           <div class="col-md-6">
             <div class="form-group">
-              <label class="col-sm-4 control-label">用户级别</label>
-              <div class="col-sm-8">
+              <!-- <label class="col-sm-4 control-label">用户级别</label> -->
+              <div class="col-sm-12">
+                <!-- <label class="radio-inline">
+                  <input type="radio" value="-1" v-model="formData.type">super
+                </label> -->
                 <label class="radio-inline">
                   <input type="radio" value="0" v-model="formData.type">管理员
                 </label>
                 <label class="radio-inline">
                   <input type="radio" value="1" v-model="formData.type">操作员
+                </label>
+                <label class="radio-inline">
+                  <input type="radio" value="2" v-model="formData.type">运维员
                 </label>
               </div>
             </div>
@@ -70,7 +86,10 @@ export default {
         password: '',
         type: 0,
         userOrg: '',
-        userRoles: []
+        userRoles: [],
+        fullname: '',
+        orgtype: 'tenant',
+        userright: JSON.stringify({'read': true, 'write': true, 'menuList': ['run', 'data', 'alarm'], 'btnList': ['mainpanel', 'edit', 'del', 'export']})
       },
       groupList: [],
       rules: {

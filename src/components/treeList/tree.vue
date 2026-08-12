@@ -19,7 +19,7 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
-// import {GET_USER_INFO} from 'store/getters/type'
+import {GET_USER_INFO} from '@/store/getters/type.js'
 
 export default {
   data () {
@@ -53,20 +53,28 @@ export default {
       ],
       treeData: [],
       defaultExpanded: [],
+      userType: '',
+      userOrg: '',
       defaultProps: {
         children: 'children',
         label: 'label'
-      }
+      },
+      instance: this.$ajax.create({
+        baseURL: 'http://123.57.87.144:7001/'
+      })
     }
   },
   computed: {
     ...mapGetters({
-      // get_user_info: GET_USER_INFO,
+      get_user_info: GET_USER_INFO
     })
   },
   created () {
     this.$nextTick(function () {
       // this.actionGetCatalog()
+      // console.log('[tree]this.get_user_info=', this.get_user_info)
+      this.userType = this.get_user_info.user.usertype
+      this.userOrg = this.get_user_info.user.userorg
       this.refresh()
     })
   },
@@ -88,28 +96,61 @@ export default {
       })
     },
     refresh () {
-      this.$ajax.get(this.$appHost + '/localall')
-        .then((res) => {
-          console.log('从数据库读取的catalog数据=', res.data)
-          // let data = res.data
-          this.treeData = this.actionGetCatalog(res.data)
-          // this.treeData = this.actionGetCatalog(this.data)
-          let data = this.treeData
-          // this.data = data
-          console.log(data[0]['label'])
-          // 初始化树对象
-          this.TreeChange({data: data[0], node: {}})
+      let items = {}
+      items.usertype = this.userType
+      items.userorg = this.userOrg
+      // console.log('[tree] items=', items)
+      this.userType = this.get_user_info.user.usertype
+      this.instance({
+        url: 'localrelative',
+        method: 'post',
+        data: items
+      }).then((res) => {
+        console.log('从数据库读取的catalog数据=', res.data)
+        // let data = res.data
+        this.treeData = this.actionGetCatalog(res.data)
+        // this.treeData = this.actionGetCatalog(this.data)
+        let data = this.treeData
+        // this.data = data
+        console.log(data[0]['label'])
+        // 初始化树对象
+        this.TreeChange({data: data[0], node: {}})
 
-          //  循环出默认展开项的ID
-          for (let i in data) {
-            this.defaultExpanded.push(data[i]['label'])
-          }
-          this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
-          this.$nextTick(() => {
-            this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
-          })
+        //  循环出默认展开项的ID
+        for (let i in data) {
+          this.defaultExpanded.push(data[i]['label'])
+        }
+        this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
+        this.$nextTick(() => {
+          this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
         })
+      }).catch(err => {
+        console.error('localrelative请求异常', err)
+      })
     },
+    // refresh () {
+    //   this.$ajax.get(this.$appHost + '/localall')
+    //     .then((res) => {
+    //       console.log('从数据库读取的catalog数据=', res.data)
+    //       // let data = res.data
+    //       this.treeData = this.actionGetCatalog(res.data)
+    //       // this.treeData = this.actionGetCatalog(this.data)
+    //       let data = this.treeData
+    //       // this.data = data
+    //       console.log(data[0]['label'])
+    //       // 初始化树对象
+    //       this.TreeChange({data: data[0], node: {}})
+
+    //       //  循环出默认展开项的ID
+    //       for (let i in data) {
+    //         this.defaultExpanded.push(data[i]['label'])
+    //       }
+    //       this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
+    //       this.$nextTick(() => {
+    //         this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
+    //       })
+    //     })
+    // },
     handleNodeClick (data, node, event) {
       setTimeout(() => {
         document.body.focus()

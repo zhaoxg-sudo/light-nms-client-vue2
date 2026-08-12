@@ -47,6 +47,7 @@
               <td>用户名</td>
               <td>用户类型</td>
               <td>所属站点ID</td>
+              <td>租户名</td>
               <td>创建时间</td>
               <td>操作</td>
             </tr>
@@ -56,6 +57,7 @@
               <td>{{ data.username }}</td>
               <td>{{ showusertype(data.usertype) }}</td>
               <td>{{ data.userorg }}</td>
+              <td>{{ data.fullname }}</td>
               <td>{{ data.createdat }}</td>
               <td width="170">
                 <!-- <button type="button" class="btn btn-sm btn-info" @click="openModal( 1 ,data.userid)">修改</button> -->
@@ -236,11 +238,17 @@ export default {
     showusertype (type) {
       let typeReturn = '未知'
       switch (type) {
+        case '-1' :
+          typeReturn = '超级管理员'
+          break
         case '0' :
           typeReturn = '管理员'
           break
         case '1' :
           typeReturn = '操作员'
+          break
+        case '2' :
+          typeReturn = '运维员'
           break
       }
       return typeReturn

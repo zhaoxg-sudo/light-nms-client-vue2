@@ -134,7 +134,7 @@
 
           <!-- 2、下方：总控面板灯泡 -->
           <div style="position:absolute;top:98px;right:14px;z-index:1002;">
-            <button class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
+            <button v-if="checkBtn('mainpanel')" class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
               <!-- 和上方完全一致：20*20、相同viewBox、样式属性 -->
               <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:5px;vertical-align:middle;flex-shrink:0;">
                 <path d="M12 2a6 6 0 00-6 6c0 2.3 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a6 6 0 00-6-6zm0 12a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5zm-1 4h2v2h-2v-2zm0 3h2v1h-2v-1z"/>
@@ -370,7 +370,8 @@ export default {
     ...mapGetters({
       get_user_info: GET_USER_INFO,
       TreeData: 'TreeData',
-      updatePoint: 'updatePoint'
+      updatePoint: 'updatePoint',
+      btnList: 'getBtnList'
     }),
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
@@ -585,30 +586,9 @@ export default {
     refreshAll () {
       window.location.reload()
     },
-    // 切换纯地图模式：隐藏左右栏，只留地图
-    // switchOnlyMap () {
-    //   this.onlyMapMode = !this.onlyMapMode
-    //   // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
-    //   this.$nextTick(() => {
-    //     // 高德地图重绘
-    //     if (this.map) {
-    //       // this.map.resize()
-    //       // 高德地图重绘：双重校验实例+resize方法是否存在
-    //       if (this.map && typeof this.map.resize === 'function') {
-    //         this.map.resize()
-    //       } else {
-    //         this.showTip('地图刷新失败')
-    //       }
-    //     }
-    //     // Echarts能耗图表重绘
-    //     if (this.$refs.chartLine) {
-    //       const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-    //       if (chart) chart.resize()
-    //     }
-    //     // 重新计算页面高度宽度
-    //     this.getHeightsWidths()
-    //   })
-    // },
+    checkBtn (btnKey) {
+      return this.btnList.includes('*') || this.btnList.includes(btnKey)
+    },
     switchOnlyMap () {
       this.onlyMapMode = !this.onlyMapMode
       this.$nextTick(() => {
@@ -834,9 +814,12 @@ export default {
         })
         this.dbGreenMarkers = []
 
-        // 请求后端读取点位数据
-        const res = await this.instance({'url': '/localall', 'method': 'get'})
-        console.log('【screen】读取的数据库/localall:', res.data)
+        // 请求后端读取点位数据,根据用户权限，过滤设备
+        let items = {}
+        items.usertype = this.get_user_info.user.usertype
+        items.userorg = this.get_user_info.user.userorg
+        const res = await this.instance({'url': '/localrelative', 'method': 'post', data: items})
+        console.log('【screen】读取的数据库/localrelative:', res.data)
         const dbPoints0 = res.data || []
         // ✅ 筛选 stationtype = '1' 的点位
         const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
@@ -1229,7 +1212,12 @@ export default {
     // update map point
     updateMapPointByID (data) {
       // 根据cid查找点位数组下标
-      const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
+      // const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
+      // cid不存在直接终止,加固，防止item.id 或者 data.cid 的值为 null / undefined，直接调用 .trim() 就会抛出该异常。
+      if (!data || !data.cid) return
+      const targetIndex = this.dbGreenMarkers.findIndex(item => {
+        return (item.id || '').trim() === (data.cid || '').trim()
+      })
       if (targetIndex === -1) {
         console.warn('未匹配到该点位ID：', data.cid)
         return

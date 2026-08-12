@@ -54,7 +54,8 @@ export default {
     return {
       formData: {
         account: '',
-        password: ''
+        password: '',
+        orgtype: ''
       },
       rememberPassword: false,
       instance: this.$ajax.create({
@@ -76,36 +77,6 @@ export default {
     ...mapActions({
       set_user_info: SET_USER_INFO
     }),
-    // submitFrom () {
-    //   if (this.formData.account === '') {
-    //     this.showTip('用户名不能为空')
-    //     return
-    //   }
-    //   if (this.formData.password === '') {
-    //     this.showTip('密码不能为空')
-    //     return
-    //   }
-    //   this.instance({
-    //     'url': '/user/login',
-    //     data: this.formData,
-    //     'method': 'post'
-    //   }).then((res) => {
-    //     if (res.data.code === 1) {
-    //       let userData = res.data.result
-    //       console.log('用户登陆', userData[0])
-    //       this.set_user_info({
-    //         user: userData[0],
-    //         userOrg: res.data.result.userorg,
-    //         powerData: null,
-    //         login: true
-    //       })
-    //       this.showTip('登录成功')
-    //       setTimeout(this.$router.push({path: '/'}), 2000)
-    //     } else {
-    //       this.showTip('账号或密码错误')
-    //     }
-    //   })
-    // },
     async submitFrom () {
       if (this.formData.account === '') {
         this.showTip('用户名不能为空')
@@ -123,14 +94,30 @@ export default {
         })
         if (res.data.code === 1) {
           let userData = res.data.result
+          let powerData = []
           console.log('用户登陆', userData[0])
+          if (this.formData.usertype !== '-1') {
+            // POST 请求向下递归节点列表，传递 userorg
+            let items = {}
+            items.usertype = userData[0].usertype
+            items.userorg = userData[0].userorg
+            const catalogRes = await this.instance({
+              url: '/downidlist',
+              data: items,
+              method: 'post'
+            })
+            powerData = catalogRes.data
+          }
           this.set_user_info({
             user: userData[0],
-            userOrg: res.data.result.userorg,
-            powerData: null,
+            userOrg: userData[0].userorg,
+            userType: userData[0].usertype,
+            poweredID: powerData,
             login: true
           })
+          console.log('用户登陆,获取allow id list=', this.set_user_info.poweredID)
           this.showTip('登录成功')
+          // 获取down tree ID list
           // 修复：原代码setTimeout立即执行跳转的错误
           setTimeout(() => {
             this.$router.push({path: '/'})

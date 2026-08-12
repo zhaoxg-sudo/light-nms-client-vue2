@@ -22,7 +22,7 @@
 // import $ from 'jquery'
 import nodeedit from './edit.vue'
 import { mapGetters, mapActions } from 'vuex'
-// import {GET_USER_INFO} from 'store/getters/type'
+import {GET_USER_INFO} from '@/store/getters/type.js'
 export default {
   props: {
     stationStatus: {
@@ -70,8 +70,8 @@ export default {
   },
   computed: {
     ...mapGetters({
-      updateState: 'updateState'
-      // get_user_info: GET_USER_INFO
+      updateState: 'updateState',
+      get_user_info: GET_USER_INFO
     })
   },
   created () {
@@ -84,26 +84,59 @@ export default {
       'TreeChange',
       'setInitData'
     ]),
+    // refresh () {
+    //   this.$ajax.get(this.$appHost + '/localall')
+    //     .then((res) => {
+    //       console.log('从数据库读取的catalog数据=', res.data)
+    //       this.treeData = this.actionGetCatalog(res.data)
+    //       let data = this.treeData
+    //       // let data = res.data.result
+    //       // this.data = data
+    //       console.log(data[0]['label'])
+    //       // 初始化树对象
+    //       this.TreeChange({data: data[0], node: {}})
+    //       // 循环出默认展开项的ID
+    //       for (let i in data) {
+    //         this.defaultExpanded.push(data[i]['label'])
+    //       }
+    //       this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
+    //       this.$nextTick(() => {
+    //         this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
+    //       })
+    //     })
+    // },
     refresh () {
-      this.$ajax.get(this.$appHost + '/localall')
-        .then((res) => {
-          console.log('从数据库读取的catalog数据=', res.data)
-          this.treeData = this.actionGetCatalog(res.data)
-          let data = this.treeData
-          // let data = res.data.result
-          // this.data = data
-          console.log(data[0]['label'])
-          // 初始化树对象
-          this.TreeChange({data: data[0], node: {}})
-          // 循环出默认展开项的ID
-          for (let i in data) {
-            this.defaultExpanded.push(data[i]['label'])
-          }
-          this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
-          this.$nextTick(() => {
-            this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
-          })
+      let items = {}
+      items.usertype = this.get_user_info.user.usertype
+      items.userorg = this.get_user_info.user.userorg
+      // console.log('[tree] items=', items)
+      // this.userType = this.get_user_info.user.usertype
+      this.instance({
+        url: '/localrelative',
+        method: 'post',
+        data: items
+      }).then((res) => {
+        console.log('从数据库读取的catalog数据=', res.data)
+        // let data = res.data
+        this.treeData = this.actionGetCatalog(res.data)
+        // this.treeData = this.actionGetCatalog(this.data)
+        let data = this.treeData
+        // this.data = data
+        console.log(data[0]['label'])
+        // 初始化树对象
+        this.TreeChange({data: data[0], node: {}})
+
+        //  循环出默认展开项的ID
+        for (let i in data) {
+          this.defaultExpanded.push(data[i]['label'])
+        }
+        this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
+        this.$nextTick(() => {
+          this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
         })
+      }).catch(err => {
+        console.error('localrelative请求异常', err)
+      })
     },
     handleNodeClick (data, node, event) {
       console.log('topo-edit config node click 事件.................................')

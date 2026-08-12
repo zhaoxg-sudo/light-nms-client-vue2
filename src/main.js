@@ -8,7 +8,8 @@ import store from './store'
 import ElementUI from 'element-ui'
 import axios from 'axios'
 import dataV from '@jiaminghi/data-view'
-
+// 导入全局地址
+import { APP_HOST } from './hosts'
 // 导入JQ
 // import $ from 'jquery'
 // 导入excel
@@ -35,8 +36,7 @@ import './assets/js/common.js'
 // import './assets/js/jquery.slimscroll.min'
 // 2.动态高度
 // import './assets/js/effect.js'
-// 导入全局地址
-import { APP_HOST } from './hosts'
+
 // 挂载全局，所有页面直接 this.$appHost 使用
 Vue.prototype.$appHost = APP_HOST
 Vue.use(dataV)
@@ -73,3 +73,16 @@ new Vue({
   },
   render: h => h(App)
 }).$mount('#app')
+// 按钮权限过滤,注册自定义指令
+// Vue.directive('btn', {
+//   inserted (el, binding) {
+//     const key = binding.value
+//     // 获取根组件实例
+//     const rootVm = Vue.prototype.$root
+//     if (!rootVm) return
+//     const btnArr = rootVm.$store.getters.getBtnList || []
+//     if (!(btnArr.includes('*') || btnArr.includes(key))) {
+//       el && el.parentNode && el.parentNode.removeChild(el)
+//     }
+//   }
+// })
