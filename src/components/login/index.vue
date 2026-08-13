@@ -36,7 +36,7 @@
           </div>
           <div class="form-group">
             <div class=" col-sm-12">
-              <button type="button" class="btn btn-primary btn-block" @click="submitFrom">登 录</button>
+              <button type="button" class="btn btn-primary btn-block" @click="submitForm">登 录</button>
             </div>
           </div>
         </form>
@@ -77,7 +77,7 @@ export default {
     ...mapActions({
       set_user_info: SET_USER_INFO
     }),
-    async submitFrom () {
+    async submitForm () {
       if (this.formData.account === '') {
         this.showTip('用户名不能为空')
         return
@@ -95,18 +95,27 @@ export default {
         if (res.data.code === 1) {
           let userData = res.data.result
           let powerData = []
-          console.log('用户登陆', userData[0])
-          if (this.formData.usertype !== '-1') {
-            // POST 请求向下递归节点列表，传递 userorg
+          const currentUser = userData[0]
+
+          // 根据后端返回的用户类型判断，不要读取表单参数
+          if (currentUser.usertype !== '-1') {
             let items = {}
-            items.usertype = userData[0].usertype
-            items.userorg = userData[0].userorg
-            const catalogRes = await this.instance({
-              url: '/downidlist',
-              data: items,
-              method: 'post'
-            })
-            powerData = catalogRes.data
+            items.usertype = currentUser.usertype
+            items.userorg = currentUser.userorg
+            try {
+              const catalogRes = await this.instance({
+                url: '/downidlist',
+                data: items,
+                method: 'post'
+              })
+              console.log('用户已登陆,获取allow id list=', catalogRes.data)
+              // 取出catalogid，强制转字符串并且去除空格，得到纯字符串数组
+              powerData = catalogRes.data.map(row => String(row.catalogid).trim())
+            } catch (err) {
+              this.showTip('downidlist登录请求失败')
+              console.error('downidlist登录异常', err)
+              powerData = []
+            }
           }
           this.set_user_info({
             user: userData[0],
@@ -115,7 +124,7 @@ export default {
             poweredID: powerData,
             login: true
           })
-          console.log('用户登陆,获取allow id list=', this.set_user_info.poweredID)
+          // console.log('用户登陆,获取allow id list=', powerData)
           this.showTip('登录成功')
           // 获取down tree ID list
           // 修复：原代码setTimeout立即执行跳转的错误

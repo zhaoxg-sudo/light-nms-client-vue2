@@ -53,7 +53,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="data in dataAll"  :key = "data.userid" >
+            <tr v-for="data in filterUserList"  :key = "data.userid" >
               <td>{{ data.username }}</td>
               <td>{{ showusertype(data.usertype) }}</td>
               <td>{{ data.userorg }}</td>
@@ -76,6 +76,7 @@
 <script>
 import $ from 'jquery'
 import { mapGetters } from 'vuex'
+import {GET_USER_INFO} from '@/store/getters/type.js'
 import tree from '../structureTree/index.vue'
 import topo from '../../topo/topo-edit.vue'
 // import paging from '../paging/index.vue'
@@ -97,8 +98,39 @@ export default {
     ...mapGetters({
       // get_user_info: GET_USER_INFO,
       updateState: 'updateState',
-      TreeData: 'TreeData'
-    })
+      TreeData: 'TreeData',
+      get_user_info: GET_USER_INFO
+    }),
+    /**
+     * 前端过滤用户列表
+     * - usertype=-1 超级管理员：展示全部
+     * - usertype=0 租户管理员：展示权限数组内所有租户用户
+     * - usertype=1 操作员：仅展示自己所属节点的用户
+     */
+    filterUserList () {
+      const loginUser = this.get_user_info.user
+      // 兜底防护，用户信息不存在返回空数组
+      if (!loginUser) return []
+
+      // 超级管理员，全部放行
+      if (loginUser.usertype === '-1') {
+        return this.dataAll
+      }
+
+      let allowCatalogIdArr = []
+      if (loginUser.usertype === '0') {
+        // 租户管理员，读取可访问的全部节点id
+        allowCatalogIdArr = Array.isArray(this.get_user_info.poweredID) ? this.get_user_info.poweredID : []
+      } else if (loginUser.usertype === '1') {
+        // 操作员，仅自己所属节点
+        // allowCatalogIdArr = [loginUser.userorg]
+      }
+
+      // 数组过滤，匹配用户所属站点ID
+      return this.dataAll.filter(row => {
+        return allowCatalogIdArr.includes(row.userorg)
+      })
+    }
   },
   data () {
     return {
@@ -125,18 +157,19 @@ export default {
       defaultcenter_contenteditable: false,
       editdefaultcenter: false,
       instance: this.$ajax.create({
-        baseURL: 'http://123.57.87.144:7001/'
+        baseURL: 'http://123.57.87.144:7001'
       })
     }
   },
   watch: {
     'TreeData': {
       handler: function (data) {
+        console.log('enter watch  TreeData:', data)
         this.targetMenu = data
         this.transferdata.targetMenuId = data.catalogid
         this.targetUserGroup = data.orgname
         this.modolType = null
-        console.log('edit刷新用户数据.......')
+        console.log('edit刷新用户数据.......', this.targetMenu.catalogid)
         this.instance({
           'url': '/user/' + this.targetMenu.catalogid,
           'method': 'get'
@@ -145,10 +178,10 @@ export default {
           console.log(res.data)
           if (res.data.code === 1) {
             this.dataAll = res.data.result
-          } else this.dataAll = {}
+          } else this.dataAll = []
         })
         this.$nextTick(function () {
-          // this.refresh()
+          this.refresh()
         })
       },
       deep: true
@@ -262,16 +295,17 @@ export default {
     },
     // 渲染表格数据
     refresh () {
-      console.log('refresh刷新用户数据.......')
+      console.log('refresh刷新用户数据.......', this.targetMenu)
       this.instance({
         'url': '/user/' + this.targetMenu.catalogid,
         'method': 'get'
       }).then((res) => {
-        console.log('\nget user by orgid:', this.targetMenu.catalogid)
+        console.log('\nget user by orgid:', this.targetMenu)
         console.log(res.data)
         if (res.data.code === 1) {
           this.dataAll = res.data.result
-        } else this.dataAll = {}
+          console.log('\nget user by orgid res=:', res.data.result)
+        } else this.dataAll = []
       })
       // 刷新工作参数
       console.log('refresh刷新default工作参数.......')

@@ -32,6 +32,12 @@ export default {
   watch: {
     stationSatus: (stationStatus) => {
       console.log('structureTree的修改状态：', stationStatus)
+    },
+    'get_user_info.poweredID' () {
+      if (!Array.isArray(this.treeData)) return
+      this.$nextTick(() => {
+        this.setActiveOrgNode()
+      })
     }
   },
   data () {
@@ -60,6 +66,7 @@ export default {
         children: 'children',
         label: 'label'
       },
+      poweredID: [],
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -76,6 +83,7 @@ export default {
   },
   created () {
     this.$nextTick(function () {
+      this.poweredID = this.get_user_info.poweredID
       this.refresh()
     })
   },
@@ -84,6 +92,47 @@ export default {
       'TreeChange',
       'setInitData'
     ]),
+    // 默认选中租户node
+    setActiveOrgNode () {
+      const userInfo = this.get_user_info.user
+      if (!userInfo || userInfo.usertype === '-1') return
+      const targetCid = String(userInfo.userorg).trim()
+      if (!targetCid || targetCid === '-1') return
+      // 关键容错：不是数组直接终止，禁止循环undefined
+      if (!Array.isArray(this.treeData) || this.treeData.length === 0) {
+        return
+      }
+
+      const findNodeByCid = (treeArr, cid) => {
+        for (let item of treeArr) {
+          if (String(item.catalogid).trim() === cid) {
+            return item
+          }
+          if (item.children && item.children.length > 0) {
+            const res = findNodeByCid(item.children, cid)
+            if (res) return res
+          }
+        }
+        return null
+      }
+      const targetNode = findNodeByCid(this.treeData, targetCid)
+      if (!targetNode) return
+
+      this.$nextTick(() => {
+        this.expandParentByLabel(targetNode.label)
+        this.$refs.tree.setCurrentKey(targetNode.label)
+      })
+    },
+    // 向上展开全部父节点
+    expandParentByLabel (labelKey) {
+      const nodeObj = this.$refs.tree.getNode(labelKey)
+      if (nodeObj && nodeObj.parent && nodeObj.parent.label) {
+        if (!this.defaultExpanded.includes(nodeObj.parent.label)) {
+          this.defaultExpanded.push(nodeObj.parent.label)
+        }
+        this.expandParentByLabel(nodeObj.parent.label)
+      }
+    },
     // refresh () {
     //   this.$ajax.get(this.$appHost + '/localall')
     //     .then((res) => {
@@ -133,12 +182,40 @@ export default {
         this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
         this.$nextTick(() => {
           this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
+          // 树加载完毕执行自动选中
+          this.setActiveOrgNode()
         })
       }).catch(err => {
         console.error('localrelative请求异常', err)
       })
     },
     handleNodeClick (data, node, event) {
+      // 树点击权限过滤
+      // console.log('node data=', data)
+      const user = this.get_user_info && this.get_user_info.user
+      if (!user) {
+        this.$message.warning('[handleNodeClick]用户信息不存在')
+        return
+      }
+      // 处理节点id，规避null、空格、数字类型问题
+      let clickCid = data.catalogid == null ? '' : String(data.catalogid)
+      clickCid = clickCid.trim()
+      console.log('now allowed node list=', this.get_user_info.poweredID, clickCid)
+      // -1=超级管理员，跳过权限校验
+      if (user.usertype !== '-1') {
+        const list = Array.isArray(this.get_user_info.poweredID) ? this.get_user_info.poweredID : []
+        console.log('now allowed node list=', list, clickCid)
+        if (!list.includes(clickCid)) {
+          this.$message.warning('无权访问该设备节点')
+          return
+        }
+      }
+
+      setTimeout(() => {
+        document.body.focus()
+        document.activeElement.blur()
+      }, 0)
+      // 树点击权限过滤end
       console.log('topo-edit config node click 事件.................................')
       console.log(node.id, data.label)
       if (event) { // 判断点击的是否为默认选中的树节点，如果不是，取消默认选中
