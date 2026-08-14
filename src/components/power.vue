@@ -26,6 +26,7 @@ export default {
       alarmMsg: '还没收到websockt数据',
       devicelist: [],
       username: '',
+      gpsSubHandler: null,
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -51,7 +52,11 @@ export default {
       // 初始化，默认展开树
       $('.orgTreeList').removeClass('treeListHide').addClass('treeListShow')
       this.$store.dispatch('treeListOpenedState', 1)
-      this.sockets.subscribe('gps', (rawGpsData) => {
+
+      if (window.globalGpsSubscribed) {
+        return
+      }
+      this.gpsSubHandler = this.sockets.subscribe('gps', (rawGpsData) => {
         console.log('收到了后台推送websocket->gps信息！！！！！！！！！！\n', rawGpsData)
         this.remoteId = rawGpsData.clientKey
         this.deviceOnline = true
@@ -59,11 +64,12 @@ export default {
 
         const rawLng = Number(rawGpsData.lng)
         const rawLat = Number(rawGpsData.lat)
-        if (isNaN(rawLng) || isNaN(rawLng) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
+        // 修复笔误：rawLng重复写的bug
+        if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
           console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
           return
         }
-        // 需要确认 power.vue 具备 wgs84ToGcj02 转换方法，没有就复制该函数到此组件
+
         const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
         console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
 
@@ -71,6 +77,7 @@ export default {
           console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
           return
         }
+
         let updatepoints = {
           cid: rawGpsData.cid,
           gcjLng,
@@ -80,6 +87,35 @@ export default {
         console.log('✅[power]发送的updatePoint state=：', updatepoints)
         window.globalGpsSubscribed = true
       })
+      // this.sockets.subscribe('gps', (rawGpsData) => {
+      //   console.log('收到了后台推送websocket->gps信息！！！！！！！！！！\n', rawGpsData)
+      //   this.remoteId = rawGpsData.clientKey
+      //   this.deviceOnline = true
+      //   this.lastGps = rawGpsData
+
+      //   const rawLng = Number(rawGpsData.lng)
+      //   const rawLat = Number(rawGpsData.lat)
+      //   if (isNaN(rawLng) || isNaN(rawLng) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
+      //     console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
+      //     return
+      //   }
+      //   // 需要确认 power.vue 具备 wgs84ToGcj02 转换方法，没有就复制该函数到此组件
+      //   const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
+      //   console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+
+      //   if (isNaN(gcjLng) || isNaN(gcjLat)) {
+      //     console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
+      //     return
+      //   }
+      //   let updatepoints = {
+      //     cid: rawGpsData.cid,
+      //     gcjLng,
+      //     gcjLat
+      //   }
+      //   this.$store.dispatch('updatePoint', updatepoints)
+      //   console.log('✅[power]发送的updatePoint state=：', updatepoints)
+      //   window.globalGpsSubscribed = true
+      // })
 
       // this.sockets.subscribe('gps', (data) => {
       //   console.log('收到了后台推送websocket->gps信息！！！！！！！！！！\n', data)
@@ -118,23 +154,28 @@ export default {
       //     console.log('收到了后台推送的不明消息！！！！！！！！！！\n', _this.alarmMsg)
       //   }
       // })
-      this.instance({
-        'url': 'localall',
-        'method': 'get'
-      }).then((res) => {
-        console.log('\npower local device db:')
-        console.log(res.data)
-        if (res.data) {
-          res.data.forEach((num) => {
-            this.devicelist.push(num)
-            // console.log(num.dianum)
-            // console.log(this.video_link_list)
-          })
-          console.log('\npower local device table')
-          console.log(this.devicelist)
-        }
-      })
+      // this.instance({
+      //   'url': 'localall',
+      //   'method': 'get'
+      // }).then((res) => {
+      //   console.log('\npower local device db:')
+      //   console.log(res.data)
+      //   if (res.data) {
+      //     res.data.forEach((num) => {
+      //       this.devicelist.push(num)
+      //       // console.log(num.dianum)
+      //       // console.log(this.video_link_list)
+      //     })
+      //     console.log('\npower local device table')
+      //     console.log(this.devicelist)
+      //   }
+      // })
     })
+  },
+  beforeDestroy () {
+    this.sockets.unsubscribe('gps')
+    this.gpsSubHandler = null
+    window.globalGpsSubscribed = false
   },
   methods: {
     wgs84ToGcj02 (wgsLon, wgsLat) {
