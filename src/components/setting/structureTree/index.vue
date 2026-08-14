@@ -6,6 +6,7 @@
       :highlight-current="true"
       :props="defaultProps"
       :default-expanded-keys="defaultExpanded"
+      :key="treeData"
       @node-click="handleNodeClick"
       node-key="label"
       :expand-on-click-node="false"
@@ -30,7 +31,7 @@ export default {
     }
   },
   watch: {
-    stationSatus: (stationStatus) => {
+    stationStatus: (stationStatus) => {
       console.log('structureTree的修改状态：', stationStatus)
     },
     'get_user_info.poweredID' () {
@@ -98,41 +99,111 @@ export default {
       if (!userInfo || userInfo.usertype === '-1') return
       const targetCid = String(userInfo.userorg).trim()
       if (!targetCid || targetCid === '-1') return
-      // 关键容错：不是数组直接终止，禁止循环undefined
       if (!Array.isArray(this.treeData) || this.treeData.length === 0) {
         return
       }
+      if (!this.$refs || !this.$refs.tree) {
+        return
+      }
 
-      const findNodeByCid = (treeArr, cid) => {
-        for (let item of treeArr) {
+      // 根据catalogid，从原始treeData向上查找完整链路路径，完全不依赖el‑tree实例
+      const findPathByCid = (treeArr, cid, path = []) => {
+        for (const item of treeArr) {
+          const currentPath = [...path, item]
           if (String(item.catalogid).trim() === cid) {
-            return item
+            return currentPath
           }
           if (item.children && item.children.length > 0) {
-            const res = findNodeByCid(item.children, cid)
-            if (res) return res
+            const ret = findPathByCid(item.children, cid, currentPath)
+            if (ret) return ret
           }
         }
         return null
       }
-      const targetNode = findNodeByCid(this.treeData, targetCid)
-      if (!targetNode) return
+
+      const pathArr = findPathByCid(this.treeData, targetCid)
+      console.log('✅ 节点完整链路pathArr', pathArr)
+      if (!pathArr) {
+        console.warn('setActiveOrgNode 未找到userorg对应树节点', targetCid)
+        return
+      }
+      const targetNode = pathArr[pathArr.length - 1]
+      // 路径数组去掉自己，剩下全部父节点，提取label作为展开key
+      const expandList = pathArr.slice(0, pathArr.length - 1).map(item => item.label)
+      this.defaultExpanded = expandList
+      console.log('✅ 需要展开父节点label集合', expandList)
 
       this.$nextTick(() => {
-        this.expandParentByLabel(targetNode.label)
-        this.$refs.tree.setCurrentKey(targetNode.label)
+        setTimeout(() => {
+          if (!this.$refs.tree) return
+          this.$refs.tree.setCurrentKey(targetNode.label)
+          const treeNode = this.$refs.tree.getNode(targetNode.label)
+          console.log('🔥 treeNode🔥', targetNode, treeNode)
+          this.TreeChange({data: targetNode, node: treeNode})
+          this.$emit('click')
+          console.log('🔥 this.$emit click🔥')
+        }, 100)
       })
     },
-    // 向上展开全部父节点
-    expandParentByLabel (labelKey) {
-      const nodeObj = this.$refs.tree.getNode(labelKey)
-      if (nodeObj && nodeObj.parent && nodeObj.parent.label) {
-        if (!this.defaultExpanded.includes(nodeObj.parent.label)) {
-          this.defaultExpanded.push(nodeObj.parent.label)
-        }
-        this.expandParentByLabel(nodeObj.parent.label)
-      }
-    },
+    // // 默认选中租户node
+    // setActiveOrgNode () {
+    //   const userInfo = this.get_user_info.user
+    //   if (!userInfo || userInfo.usertype === '-1') return
+    //   const targetCid = String(userInfo.userorg).trim()
+    //   if (!targetCid || targetCid === '-1') return
+    //   if (!Array.isArray(this.treeData) || this.treeData.length === 0) {
+    //     return
+    //   }
+    //   if (!this.$refs || !this.$refs.tree) {
+    //     return
+    //   }
+
+    //   const findNodeByCid = (treeArr, cid) => {
+    //     for (let item of treeArr) {
+    //       if (String(item.catalogid).trim() === cid) {
+    //         return item
+    //       }
+    //       if (item.children && item.children.length > 0) {
+    //         const res = findNodeByCid(item.children, cid)
+    //         if (res) return res
+    //       }
+    //     }
+    //     return null
+    //   }
+    //   const targetNode = findNodeByCid(this.treeData, targetCid)
+    //   console.log('✅ 从this.treeData找到租户节点树节点=✅ ', targetCid, targetNode)
+    //   if (!targetNode) {
+    //     console.warn('setActiveOrgNode 未找到userorg对应树节点', targetCid)
+    //     return
+    //   }
+
+    //   // 递归收集所有父节点label，存入defaultExpanded
+    //   const collectParentLabel = (node, arr) => {
+    //     if (!node) return
+    //     const nodeObj = this.$refs.tree.getNode(node.label)
+    //     if (nodeObj && nodeObj.parent && nodeObj.parent.label) {
+    //       arr.push(nodeObj.parent.label)
+    //       collectParentLabel(nodeObj.parent.data, arr)
+    //     }
+    //   }
+    //   const expandList = []
+    //   collectParentLabel(targetNode, expandList)
+    //   // 响应式覆盖defaultExpanded
+    //   this.defaultExpanded = expandList
+    //   console.log('✅ 递归收集所有父节点label=✅ ', expandList)
+
+    //   this.$nextTick(() => {
+    //     setTimeout(() => {
+    //       if (!this.$refs.tree) return
+    //       this.$refs.tree.setCurrentKey(targetNode.label)
+    //       const treeNode = this.$refs.tree.getNode(targetNode.label)
+    //       console.log('🔥 treeNode🔥', targetNode, treeNode)
+    //       this.TreeChange({data: targetNode, node: treeNode})
+    //       this.$emit('click')
+    //       console.log('🔥 this.$emit click🔥')
+    //     }, 200)
+    //   })
+    // },
     // refresh () {
     //   this.$ajax.get(this.$appHost + '/localall')
     //     .then((res) => {

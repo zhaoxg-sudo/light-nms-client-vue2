@@ -38,7 +38,7 @@
       </div>
       <div class="table">
         <!-- <h5> 用户 </h5> -->
-        <span style="float:right"><button type="submit" class="btn btn-sm btn-info" @click="openModal(1 ,0)">新增用户</button></span>
+        <span style="float:right"><button v-if="canAddUser" type="submit" class="btn btn-sm btn-info" @click="openModal(1 ,0)">新增用户</button></span>
         <table class="table">
           <caption>
           </caption>
@@ -61,7 +61,7 @@
               <td>{{ data.createdat }}</td>
               <td width="170">
                 <!-- <button type="button" class="btn btn-sm btn-info" @click="openModal( 1 ,data.userid)">修改</button> -->
-                <button type="button" class="btn btn-sm btn-default" @click="deleteUser(data.username)">删除</button>
+                <button v-if="canAddUser" type="button" class="btn btn-sm btn-default" @click="deleteUser(data.username)">删除</button>
               </td>
             </tr>
           </tbody>
@@ -130,6 +130,27 @@ export default {
       return this.dataAll.filter(row => {
         return allowCatalogIdArr.includes(row.userorg)
       })
+    },
+    canAddUser () {
+      const loginUser = this.get_user_info.user
+      if (!loginUser) return false
+      const typeNum = Number(loginUser.usertype)
+
+      // 操作员、运维员直接无权限
+      if (typeNum >= 1) {
+        return false
+      }
+      // 超级管理员直接放行
+      if (typeNum === -1) {
+        return true
+      }
+
+      // usertype=0 租户管理员：判断当前选中的targetMenu.catalogid 是否在自己可访问节点数组 poweredID
+      if (!this.targetMenu || !this.targetMenu.catalogid) {
+        return false
+      }
+      const allowIds = Array.isArray(this.get_user_info.poweredID) ? this.get_user_info.poweredID : []
+      return allowIds.includes(this.targetMenu.catalogid)
     }
   },
   data () {
