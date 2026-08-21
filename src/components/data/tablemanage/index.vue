@@ -127,10 +127,10 @@ export default {
     this.selectValue = ''
     this.selectLegend = ''
     this.$nextTick(async () => {
-      await this.getAllStation()
+      // await this.getAllStation()
       // await this.getDeviceDataFromDB()
       // await this.getDeviceDataFromClsdDB()
-      await this.getDeviceData()
+      // await this.getDeviceData()
     })
   },
   beforeMount () {},

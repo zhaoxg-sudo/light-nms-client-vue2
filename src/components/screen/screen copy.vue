@@ -134,7 +134,7 @@
 
           <!-- 2、下方：总控面板灯泡 -->
           <div style="position:absolute;top:98px;right:14px;z-index:1002;">
-            <button class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
+            <button v-if="checkBtn('mainpanel')" class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
               <!-- 和上方完全一致：20*20、相同viewBox、样式属性 -->
               <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:5px;vertical-align:middle;flex-shrink:0;">
                 <path d="M12 2a6 6 0 00-6 6c0 2.3 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a6 6 0 00-6-6zm0 12a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5zm-1 4h2v2h-2v-2zm0 3h2v1h-2v-1z"/>
@@ -370,7 +370,8 @@ export default {
     ...mapGetters({
       get_user_info: GET_USER_INFO,
       TreeData: 'TreeData',
-      updatePoint: 'updatePoint'
+      updatePoint: 'updatePoint',
+      btnList: 'getBtnList'
     }),
     hasPointEditPerm () {
       return this.userPermissions.includes('point:edit')
@@ -411,7 +412,7 @@ export default {
     },
     'updatePoint': {
       handler: async function (data) {
-        console.log('[screen] updatePoint:=', data)
+        console.log('[screen] store->updatePoint:=', data)
 
         this.$nextTick(async function () {
           // 直接调用set map point方法，传入设备ID
@@ -433,42 +434,42 @@ export default {
     } else {
       this.userPermissions.push('device:read')
     }
-    if (window.globalGpsSubscribed) {
-      return
-    }
+    // if (window.globalGpsSubscribed) {
+    //   return
+    // }
 
-    if (this.sockets) {
-      this.sockets.subscribe('gps', (rawGpsData) => {
-        console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
-        // window.latestGpsData = rawGpsData
-        this.remoteId = rawGpsData.clientKey
-        this.deviceOnline = true
-        this.lastGps = rawGpsData
+    // if (this.sockets) {
+    //   this.sockets.subscribe('gps', (rawGpsData) => {
+    //     console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
+    //     // window.latestGpsData = rawGpsData
+    //     this.remoteId = rawGpsData.clientKey
+    //     this.deviceOnline = true
+    //     this.lastGps = rawGpsData
 
-        const rawLng = Number(rawGpsData.lng)
-        const rawLat = Number(rawGpsData.lat)
-        if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
-          console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
-          return
-        }
+    //     const rawLng = Number(rawGpsData.lng)
+    //     const rawLat = Number(rawGpsData.lat)
+    //     if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
+    //       console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
+    //       return
+    //     }
 
-        const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
-        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+    //     const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
+    //     console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
 
-        if (isNaN(gcjLng) || isNaN(gcjLat)) {
-          console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
-          return
-        }
-        // 发送 state,update map point
-        this.$store.dispatch('updatePoint', {
-          cid: rawGpsData.cid,
-          gcjLng,
-          gcjLat
-        })
-      })
+    //     if (isNaN(gcjLng) || isNaN(gcjLat)) {
+    //       console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
+    //       return
+    //     }
+    //     // 发送 state,update map point
+    //     this.$store.dispatch('updatePoint', {
+    //       cid: rawGpsData.cid,
+    //       gcjLng,
+    //       gcjLat
+    //     })
+    //   })
 
-      window.globalGpsSubscribed = true
-    }
+    //   window.globalGpsSubscribed = true
+    // }
   },
 
   mounted () {
@@ -518,48 +519,76 @@ export default {
   beforeDestroy () {
     clearInterval(this.timer)
     this.destroyCenterMarker() // 销毁中心点标记
+    // 【修改1】清理全局resize监听
+    window.removeEventListener('resize', window.__screenResizeHandler)
+
+    // 【修改2】删除全局挂载引用，释放组件内存
+    delete window.__screenResizeHandler
+    delete window.vueInstance
+    delete window.callOpenPanel
+
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
     if (document.fullscreenElement) {
       document.exitFullscreen()
     }
-    if (this.map) {
+    if (this.map && typeof this.map.clear === 'function') {
+      // 【修改4】先清空地图覆盖物，再销毁实例
+      this.map.clear()
+      this.map.off()
       this.map.destroy()
+      this.map = null
     }
     window.currentMapInstance = null
     window.currentMapMarker = null
     window.currentMapText = null
   },
+  // ↓ 新增 deactivated ↓
+  deactivated () {
+    console.log('[screen] 路由离开/缓存失活，清理地图资源')
 
+    this.showDropdown = false
+
+    clearTimeout(this.dropdownTimer)
+
+    this.destroyCenterMarker()
+
+    if (this.map) {
+      this.map.clear()
+      this.map.off()
+    }
+
+    this.dbGreenMarkers = []
+    this.manualMarkers = []
+    this.manualPointList = []
+  },
+
+  // 新增 activated
+  activated () {
+    console.log('[screen] 切回大屏页面，重置地图状态')
+
+    this.$nextTick(() => {
+      setTimeout(() => {
+        if (this.map && typeof this.map.resize === 'function') {
+          this.map.resize()
+        }
+      }, 150)
+    })
+  },
+  // 每次切入路由强制刷新点位
+  beforeRouteEnter (to, from, next) {
+    next(async vm => {
+      // await vm.$store.dispatch('updatePoint')
+    })
+  },
   sockets: {},
   methods: {
     refreshAll () {
       window.location.reload()
     },
-    // 切换纯地图模式：隐藏左右栏，只留地图
-    // switchOnlyMap () {
-    //   this.onlyMapMode = !this.onlyMapMode
-    //   // 布局变化后，重置地图大小 + 图表大小，防止画布塌陷
-    //   this.$nextTick(() => {
-    //     // 高德地图重绘
-    //     if (this.map) {
-    //       // this.map.resize()
-    //       // 高德地图重绘：双重校验实例+resize方法是否存在
-    //       if (this.map && typeof this.map.resize === 'function') {
-    //         this.map.resize()
-    //       } else {
-    //         this.showTip('地图刷新失败')
-    //       }
-    //     }
-    //     // Echarts能耗图表重绘
-    //     if (this.$refs.chartLine) {
-    //       const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-    //       if (chart) chart.resize()
-    //     }
-    //     // 重新计算页面高度宽度
-    //     this.getHeightsWidths()
-    //   })
-    // },
+    checkBtn (btnKey) {
+      return this.btnList.includes('*') || this.btnList.includes(btnKey)
+    },
     switchOnlyMap () {
       this.onlyMapMode = !this.onlyMapMode
       this.$nextTick(() => {
@@ -785,9 +814,12 @@ export default {
         })
         this.dbGreenMarkers = []
 
-        // 请求后端读取点位数据
-        const res = await this.instance({'url': '/localall', 'method': 'get'})
-        console.log('【screen】读取的数据库/localall:', res.data)
+        // 请求后端读取点位数据,根据用户权限，过滤设备
+        let items = {}
+        items.usertype = this.get_user_info.user.usertype
+        items.userorg = this.get_user_info.user.userorg
+        const res = await this.instance({'url': '/localrelative', 'method': 'post', data: items})
+        console.log('【screen】读取的数据库/localrelative:', res.data)
         const dbPoints0 = res.data || []
         // ✅ 筛选 stationtype = '1' 的点位
         const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
@@ -1180,7 +1212,12 @@ export default {
     // update map point
     updateMapPointByID (data) {
       // 根据cid查找点位数组下标
-      const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
+      // const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
+      // cid不存在直接终止,加固，防止item.id 或者 data.cid 的值为 null / undefined，直接调用 .trim() 就会抛出该异常。
+      if (!data || !data.cid) return
+      const targetIndex = this.dbGreenMarkers.findIndex(item => {
+        return (item.id || '').trim() === (data.cid || '').trim()
+      })
       if (targetIndex === -1) {
         console.warn('未匹配到该点位ID：', data.cid)
         return
@@ -1207,7 +1244,7 @@ export default {
       currPoint.gcjLat = data.gcjLat
 
       // 3、重建数组引用，强制computed列表刷新
-      this.dbGreenMarkers = [...this.dbGreenMarkers]
+      // this.dbGreenMarkers = [...this.dbGreenMarkers]
 
       console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
     },

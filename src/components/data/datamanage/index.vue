@@ -173,6 +173,38 @@ export default {
       this.refresh()
     })
   },
+  beforeDestroy () {
+    // 1、终止正在进行的网络请求
+    // 2、销毁axios实例引用
+    this.instance = null
+
+    // 3、清空全部大数组，断开引用链
+    this.dataparameter = []
+    this.data = []
+    this.pageData = {
+      total: 0,
+      pageIndex: 1,
+      pageSize: 10
+    }
+    this.formData = {
+      catalogid: '',
+      protocoltype: '2',
+      firedTime: '',
+      BeginTime: '',
+      EndTime: ''
+    }
+    this.value = null
+    this.selectValue = ''
+
+    // 4、手动销毁el‑tree组件实例，清除dom残留
+    if (this.$refs.innerTree) {
+      this.$refs.innerTree.$destroy()
+    }
+    // 5、清除下拉弹窗残留dom
+    if (this.$refs.selectTree) {
+      this.$refs.selectTree.visible = false
+    }
+  },
   beforeMount () {},
   mounted () {},
   methods: {

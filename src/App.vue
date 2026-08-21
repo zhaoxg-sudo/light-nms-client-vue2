@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <keep-alive include="Screen">
+    <keep-alive :max="3" exclude="Screen">
       <router-view />
     </keep-alive>
   </div>

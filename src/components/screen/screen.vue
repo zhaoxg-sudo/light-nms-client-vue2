@@ -327,13 +327,11 @@ export default {
       manualPointList: [],
       manualMarkers: [],
       drawPointMode: false,
-      // userPermissions: ['point:edit', 'device:read'],
       userPermissions: [],
-      // 新增点位弹窗数据
       showPointDialog: false,
       tempPoint: {
         belong: '',
-        type: '', // 新增
+        type: '',
         name: '',
         id: '',
         lng: '',
@@ -341,29 +339,38 @@ export default {
         wgsLng: '',
         wgsLat: ''
       },
-      dbGreenMarkers: [], // 独立数组：数据库读取的绿色点位
+      dbGreenMarkers: [],
       deviceSearch: '',
-      centerMarker: null, // 地图中心点临时标记
-      centerLabel: null, // 中心点文字标签
+      centerMarker: null,
+      centerLabel: null,
       defaultLng: 116.331644,
       defaultLat: 40.043262,
       loginusertype: '',
-      // 自定义弹窗
       showTipModal: false,
       tipText: '',
-      onlyMapMode: false, // 纯地图模式开关
-      // ========== 新增搜索变量 ==========
+      onlyMapMode: false,
       searchKey: '',
       showDropdown: false,
-      placeSearch: null, // 高德地点搜索实例
-      matchDeviceList: [], // 匹配设备结果
-      matchPoiList: [], // 高德地址结果
-      totalResult: [], // 合并总结果（控制下拉显示）
-      dropdownTimer: null, // 失焦延时关闭定时器
+      placeSearch: null,
+      matchDeviceList: [],
+      matchPoiList: [],
+      totalResult: [],
+      dropdownTimer: null,
+      instance: null,
 
-      instance: this.$ajax.create({
-        baseURL: this.$appHost
-      })
+      // 保存地图事件句柄，用于解绑
+      mapClickMap: null,
+      mapDblClickMap: null,
+      // 存储所有marker事件回调，销毁时解绑
+      markerEventList: [],
+      // 地图工具栏实例
+      toolBar: null,
+      globalHoverTimer: null, // 提升为实例属性，替代局部变量
+      infoWinOpenTimers: [], // 追踪 infoWindow open 中的 setTimeout
+      manualClickInfoWins: [], // 追踪手动点位的 click InfoWindow
+      treeDataTimer: null, // watch TreeData 中的 setTimeout
+      activateTimer: null, // activated 中的 setTimeout
+      switchMapTimer: null // switchOnlyMap 中的 setTimeout
     }
   },
   computed: {
@@ -378,7 +385,6 @@ export default {
     },
     tableList () {
       const keyword = this.deviceSearch.trim().toLowerCase()
-      // 直接从数据库点位数组映射表格数据
       return this.dbGreenMarkers.filter((row) => {
         const name = String(row.name || '').toLowerCase()
         const id = String(row.id || '').toLowerCase()
@@ -390,19 +396,12 @@ export default {
   watch: {
     'TreeData': {
       handler: async function (data) {
-        console.log('[screen] has watched  tree data id ,labal:=', data.catalogid, data.label)
-        // console.log('this.acCurrentCatalogID==', this.currentCatalogID)
-        // this.currentCatalogLabelAc = data.label
+        console.log('[screen] has watched tree data id, label :=', data.catalogid, data.label)
         this.$nextTick(async function () {
-          // 直接调用set map center方法，传入设备ID
           if (data.stationtype === '1') {
-            // this.handleClickRow(data.catalogid)
-            // 1. 先关闭所有点位弹窗，清空旧弹窗DOM
-            // this.markerList.forEach(marker => {
-            //   marker.closeInfoWindow()
-            // })
-            // 延时后打开新弹窗
-            setTimeout(() => {
+            // ✅ 修复
+            if (this.treeDataTimer) clearTimeout(this.treeDataTimer)
+            this.treeDataTimer = setTimeout(() => {
               this.handleClickRow(data.catalogid)
             }, 150)
           }
@@ -412,16 +411,16 @@ export default {
     },
     'updatePoint': {
       handler: async function (data) {
-        console.log('[screen] store->updatePoint:=', data)
-
-        this.$nextTick(async function () {
-          // 直接调用set map point方法，传入设备ID
-          this.updateMapPointByID(data)
-        })
+        console.log('[screen] store->updatePoint :=', data)
+        if (!data || !data.cid) return
+        this.updateMapPointByID(data)
       }
     }
   },
   created () {
+    this.instance = this.$ajax.create({
+      baseURL: this.$appHost
+    })
     this.$nextTick(() => {
       $('.orgTreeList').removeClass('treeListShow').addClass('treeListHide')
       getHeight()
@@ -434,52 +433,9 @@ export default {
     } else {
       this.userPermissions.push('device:read')
     }
-    // if (window.globalGpsSubscribed) {
-    //   return
-    // }
-
-    // if (this.sockets) {
-    //   this.sockets.subscribe('gps', (rawGpsData) => {
-    //     console.log('🔥 实时收到原始GPS(WGS84) ===>', rawGpsData)
-    //     // window.latestGpsData = rawGpsData
-    //     this.remoteId = rawGpsData.clientKey
-    //     this.deviceOnline = true
-    //     this.lastGps = rawGpsData
-
-    //     const rawLng = Number(rawGpsData.lng)
-    //     const rawLat = Number(rawGpsData.lat)
-    //     if (isNaN(rawLng) || isNaN(rawLat) || rawLng < 70 || rawLng > 140 || rawLat < 15 || rawLat > 60) {
-    //       console.warn('收到无效GPS经纬度，跳过本次点位更新', rawLng, rawLat, rawGpsData)
-    //       return
-    //     }
-
-    //     const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
-    //     console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
-
-    //     if (isNaN(gcjLng) || isNaN(gcjLat)) {
-    //       console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
-    //       return
-    //     }
-    //     // 发送 state,update map point
-    //     this.$store.dispatch('updatePoint', {
-    //       cid: rawGpsData.cid,
-    //       gcjLng,
-    //       gcjLat
-    //     })
-    //   })
-
-    //   window.globalGpsSubscribed = true
-    // }
   },
 
   mounted () {
-    // 全局挂载当前Vue实例，供弹窗按钮调用openDevicePanel
-    window.vueInstance = this
-
-    // 全局封装打开设备面板方法，供弹窗按钮调用
-    window.callOpenPanel = (deviceId) => {
-      window.vueInstance.openDevicePanel(deviceId)
-    }
     this.updateTime()
     this.timer = setInterval(() => this.updateTime(), 1000)
     this.initMap()
@@ -491,7 +447,7 @@ export default {
     }
     window.addEventListener('resize', window.__screenResizeHandler)
 
-    document.addEventListener('fullscreenchange', () => {
+    document.addEventListener('fullscreenchange', this.__fullscreenHandler = () => {
       if (!document.fullscreenElement) {
         this.isFullScreen = false
         this.$nextTick(() => {
@@ -500,113 +456,255 @@ export default {
         })
       }
     })
-
-    if (window.latestGpsData) {
-      // const rawData = window.latestGpsData
-      // this.remoteId = rawData.clientKey
-      // this.deviceOnline = true
-      // const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawData.lng, rawData.lat)
-      // const point = new window.AMap.LngLat(gcjLng, gcjLat)
-      // this.marker.setPosition(point)
-      // this.textLabel.setPosition(point)
-    }
   },
+
+  // ========= 统一清理地图覆盖物+解绑marker事件 =========
+  // destroyAllMapOverlay () {
+  //   // 1、销毁数据库点位 marker / label / infoWindow
+  //   this.dbGreenMarkers.forEach(item => {
+  //     // 移除事件
+  //     if (item.marker) {
+  //       item.marker.off('mouseover')
+  //       item.marker.off('mouseout')
+  //       item.marker.off('dblclick')
+  //       if (this.map) this.map.remove(item.marker)
+  //     }
+  //     if (item.label && this.map) this.map.remove(item.label)
+  //     if (item.mainInfoWin) {
+  //       item.mainInfoWin.close()
+  //       item.mainInfoWin.off('open')
+  //     }
+  //     item.marker = null
+  //     item.label = null
+  //     item.mainInfoWin = null
+  //   })
+  //   this.dbGreenMarkers = []
+
+  //   // 2、销毁手动添加橙色点位
+  //   this.manualMarkers.forEach(item => {
+  //     if (item.marker) {
+  //       item.marker.off('mouseover')
+  //       item.marker.off('mouseout')
+  //       item.marker.off('click')
+  //       if (this.map) this.map.remove(item.marker)
+  //     }
+  //     if (item.label && this.map) this.map.remove(item.label)
+  //     item.marker = null
+  //     item.label = null
+  //   })
+  //   this.manualMarkers = []
+  //   this.manualPointList = []
+
+  //   // 3、中心点标记
+  //   this.destroyCenterMarker()
+  //   this.markerEventList = []
+  // },
 
   beforeRouteLeave (to, from, next) {
     next()
   },
 
   beforeDestroy () {
-    clearInterval(this.timer)
-    this.destroyCenterMarker() // 销毁中心点标记
-    // 【修改1】清理全局resize监听
-    window.removeEventListener('resize', window.__screenResizeHandler)
-
-    // 【修改2】删除全局挂载引用，释放组件内存
-    delete window.__screenResizeHandler
-    delete window.vueInstance
-    delete window.callOpenPanel
-
+    this.clearAllTimer()
+    this.destroyMapInstance()
+    // 销毁 ECharts
+    if (this.$refs.chartLine) {
+      const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+      if (chart) chart.dispose()
+    }
+    // 清除 resize、全屏事件
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
+    document.removeEventListener('fullscreenchange', this.__fullscreenHandler)
+    this.__fullscreenHandler = null
+    // 清空axios实例
+    this.instance = null
     if (document.fullscreenElement) {
       document.exitFullscreen()
     }
-    if (this.map && typeof this.map.clear === 'function') {
-      // 【修改4】先清空地图覆盖物，再销毁实例
-      this.map.clear()
-      this.map.off()
-      this.map.destroy()
-      this.map = null
-    }
-    window.currentMapInstance = null
-    window.currentMapMarker = null
-    window.currentMapText = null
   },
-  // ↓ 新增 deactivated ↓
+
   deactivated () {
     console.log('[screen] 路由离开/缓存失活，清理地图资源')
-
+    this.clearAllTimer()
     this.showDropdown = false
-
-    clearTimeout(this.dropdownTimer)
-
-    this.destroyCenterMarker()
-
-    if (this.map) {
-      this.map.clear()
-      this.map.off()
+    // ✅ 先销毁地图和覆盖物，再清空数组引用
+    // this.destroyMapInstance()
+    // this.dbGreenMarkers = []
+    // this.manualPointList = []
+    // this.manualMarkers = []
+    if (this.$refs.chartLine) {
+      const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+      if (chart) chart.dispose()
     }
-
-    this.dbGreenMarkers = []
-    this.manualMarkers = []
-    this.manualPointList = []
+    // ✅ 新增：提示浏览器 GC（开发调试用）
+    if (window.gc) window.gc()
   },
 
-  // 新增 activated
   activated () {
-    console.log('[screen] 切回大屏页面，重置地图状态')
-
+    console.log('[screen] 切回大屏页面，重新初始化地图')
     this.$nextTick(() => {
-      setTimeout(() => {
-        if (this.map && typeof this.map.resize === 'function') {
-          this.map.resize()
-        }
-      }, 150)
+      if (!this.map) {
+        this.initMap()
+      } else {
+        // ✅ 修复
+        if (this.activateTimer) clearTimeout(this.activateTimer)
+        this.activateTimer = setTimeout(() => {
+          if (this.map && typeof this.map.resize === 'function') {
+            this.map.resize()
+          }
+        }, 150)
+      }
     })
   },
-  // 每次切入路由强制刷新点位
+
   beforeRouteEnter (to, from, next) {
     next(async vm => {
-      // await vm.$store.dispatch('updatePoint')
     })
   },
+
   sockets: {},
+
   methods: {
+    destroyAllMapOverlay () {
+      // ✅ 新增：先清理所有待执行的 setTimeout
+      this.infoWinOpenTimers.forEach(id => clearTimeout(id))
+      this.infoWinOpenTimers = []
+      if (this.globalHoverTimer) {
+        clearTimeout(this.globalHoverTimer)
+        this.globalHoverTimer = null
+      }
+
+      // 1、销毁数据库点位
+      this.dbGreenMarkers.forEach(item => {
+        if (item.marker) {
+          item.marker.off('mouseover')
+          item.marker.off('mouseout')
+          item.marker.off('dblclick')
+          if (this.map) this.map.remove(item.marker)
+        }
+        if (item.label && this.map) this.map.remove(item.label)
+        if (item.mainInfoWin) {
+          // ✅ 新增：清理 DOM 事件引用，断开闭包
+          const winDom = item.mainInfoWin.getContentDom()
+          if (winDom) {
+            winDom.onmouseenter = null
+            winDom.onmouseleave = null
+            const btn = winDom.querySelector('.device-panel-btn')
+            if (btn) btn.onclick = null
+          }
+          item.mainInfoWin.close()
+          item.mainInfoWin.off('open')
+          item.mainInfoWin = null
+        }
+        item.marker = null
+        item.label = null
+      })
+      this.dbGreenMarkers = []
+
+      // 2、销毁手动添加橙色点位
+      this.manualMarkers.forEach(item => {
+        if (item.marker) {
+          item.marker.off('mouseover')
+          item.marker.off('mouseout')
+          item.marker.off('click')
+          if (this.map) this.map.remove(item.marker)
+        }
+        if (item.label && this.map) this.map.remove(item.label)
+        item.marker = null
+        item.label = null
+      })
+      this.manualMarkers = []
+      this.manualPointList = []
+
+      // ✅ 新增：清理手动点位的 click InfoWindow
+      this.manualClickInfoWins.forEach(win => win.close())
+      this.manualClickInfoWins = []
+
+      // 3、中心点标记
+      this.destroyCenterMarker()
+      this.markerEventList = []
+    },
+
+    // ========= 完整销毁地图实例 =========
+    destroyMapInstance () {
+      if (!this.map) return
+      // 移除工具栏控件
+      if (this.toolBar) {
+        this.map.removeControl(this.toolBar)
+        this.toolBar = null
+      }
+      // 解绑地图 click / dblclick
+      if (this.mapClickMap) {
+        this.map.off('click', this.mapClickMap)
+        this.mapClickMap = null
+      }
+      if (this.mapDblClickMap) {
+        this.map.off('dblclick', this.mapDblClickMap)
+        this.mapDblClickMap = null
+      }
+      this.destroyAllMapOverlay()
+      this.map.clearMap() // ✅ 正确
+      this.map.off()
+      this.map.destroy()
+      // ✅ 新增：清空容器 DOM，断开高德内部引用
+      const container = document.getElementById('container')
+      if (container) {
+        container.innerHTML = ''
+      }
+      this.map = null
+      this.placeSearch = null
+    },
+    // 统一清理全部定时器
+    clearAllTimer () {
+      if (this.timer) {
+        clearInterval(this.timer)
+        this.timer = null
+      }
+      if (this.dropdownTimer) {
+        clearTimeout(this.dropdownTimer)
+        this.dropdownTimer = null
+      }
+      // for (let i = 0; i < 18000; i++) clearTimeout(i)
+      // for (let i = 0; i < 18000; i++) clearInterval(i)
+      // console.log('已清理全部定时器')
+      // ✅ 新增：清理所有泄漏的定时器
+      if (this.globalHoverTimer) {
+        clearTimeout(this.globalHoverTimer)
+        this.globalHoverTimer = null
+      }
+      this.infoWinOpenTimers.forEach(id => clearTimeout(id))
+      this.infoWinOpenTimers = []
+      if (this.treeDataTimer) {
+        clearTimeout(this.treeDataTimer)
+        this.treeDataTimer = null
+      }
+      if (this.activateTimer) {
+        clearTimeout(this.activateTimer)
+        this.activateTimer = null
+      }
+      if (this.switchMapTimer) {
+        clearTimeout(this.switchMapTimer)
+        this.switchMapTimer = null
+      }
+    },
     refreshAll () {
       window.location.reload()
     },
+
     checkBtn (btnKey) {
       return this.btnList.includes('*') || this.btnList.includes(btnKey)
     },
+
     switchOnlyMap () {
       this.onlyMapMode = !this.onlyMapMode
       this.$nextTick(() => {
-        setTimeout(() => {
-          // 高德地图重绘
+        // ✅ 修复
+        if (this.switchMapTimer) clearTimeout(this.switchMapTimer)
+        this.switchMapTimer = setTimeout(() => {
           if (this.map && typeof this.map.resize === 'function') {
             this.map.resize()
-          } else {
-            // 短暂等待，重试一次，不立即弹窗
-            setTimeout(() => {
-              if (this.map && typeof this.map.resize === 'function') {
-                this.map.resize()
-              }
-              // 彻底删除无条件弹出“刷新失败”，避免时序误告警
-            }, 80)
           }
-
-          // Echarts能耗图表重绘
           if (this.$refs.chartLine) {
             const chart = echarts.getInstanceByDom(this.$refs.chartLine)
             if (chart) chart.resize()
@@ -615,11 +713,11 @@ export default {
       })
     },
 
-    // 自定义提示弹窗，替代原生this.showTip
     showTip (msg) {
       this.tipText = msg
       this.showTipModal = true
     },
+
     wgs84ToGcj02 (wgsLon, wgsLat) {
       const PI = 3.1415926535897932384626
       const a = 6378245.0
@@ -628,6 +726,7 @@ export default {
       const outOfChina = (lon, lat) => {
         return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
       }
+
       if (outOfChina(wgsLon, wgsLat)) {
         return [wgsLon, wgsLat]
       }
@@ -639,6 +738,7 @@ export default {
         ret += (160.0 * Math.sin(y / 12.0 * PI) + 320.0 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
         return ret
       }
+
       const transformLon = (x, y) => {
         let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
         ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
@@ -649,33 +749,39 @@ export default {
 
       let dLat = transformLat(wgsLon - 105.0, wgsLat - 35.0)
       let dLon = transformLon(wgsLon - 105.0, wgsLat - 35.0)
+
       const radLat = wgsLat / 180.0 * PI
       const magic = Math.sin(radLat)
       const magic2 = 1 - ee * magic * magic
       const sqrtMagic = Math.sqrt(magic2)
+
       dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic2 * sqrtMagic) * PI)
       dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
+
       const gcjLat = wgsLat + dLat
       const gcjLon = wgsLon + dLon
+
       return [gcjLon, gcjLat]
     },
+
     openDevicePanel (id) {
-      // 根据传入的设备ID，从点位数组查找当前设备信息
       console.log('点击时的点位数组', this.dbGreenMarkers)
+
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
+
       console.log('点击时发现的点位变量', deviceItem)
-      // 判定条件：存在点位 并且 设备在线
+
       if (deviceItem && deviceItem.online === true) {
-        // 赋值远端ID，打开面板弹窗
         this.remoteId = id
         this.showDevicePanel = true
       } else {
-        // this.showTip('该设备当前离线，无法打开设备控制面板！')
         this.showTip('该设备当前离线，无法打开设备控制面板！')
       }
     },
+
     toggleFullScreen (e) {
       const targetDom = document.querySelector('.screen-page')
+
       if (!this.isFullScreen) {
         targetDom.requestFullscreen().catch(err => {
           console.warn('全屏开启失败', err)
@@ -685,11 +791,13 @@ export default {
         document.exitFullscreen()
         this.isFullScreen = false
       }
+
       e.target.blur()
     },
 
     toggleDrawMode () {
       this.drawPointMode = !this.drawPointMode
+
       if (this.drawPointMode) {
         this.showTip('已开启点位配置，点击地图任意位置弹出录入窗口')
       }
@@ -697,18 +805,26 @@ export default {
 
     clearAllManualPoint () {
       this.manualMarkers.forEach(item => {
-        this.map.remove(item.marker)
-        this.map.remove(item.label)
+        if (item.marker) {
+          item.marker.off('mouseover')
+          item.marker.off('mouseout')
+          item.marker.off('click')
+        }
+        if (item.marker && this.map) this.map.remove(item.marker)
+        if (item.label && this.map) this.map.remove(item.label)
+        item.marker = null
+        item.label = null
       })
+
       this.manualMarkers = []
       this.manualPointList = []
     },
 
-    // 关闭点位弹窗，清空表单
     closePointDialog () {
       this.showPointDialog = false
       this.tempPoint = {
         belong: '',
+        type: '',
         name: '',
         id: '',
         lng: '',
@@ -718,111 +834,145 @@ export default {
       }
     },
 
-    // 弹窗确认新增点位
     confirmAddPoint () {
       if (!this.tempPoint.belong || !this.tempPoint.name || !this.tempPoint.id) {
         this.showTip('归属、点位名称、ID不能为空！')
         return
       }
+
       this.addManualMarker(this.tempPoint)
       this.closePointDialog()
     },
 
     async initMap () {
       try {
+        // ✅ 确保完全销毁后再新建
+        if (this.map) {
+          this.destroyMapInstance()
+          // 给高德一点清理时间
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+        const container = document.getElementById('container')
+        if (!container) {
+          console.error('地图容器 #container 不存在')
+          return
+        }
+        // ✅ 确保容器是空的
+        container.innerHTML = ''
+
         const initLng = 116.331644
         const initLat = 40.043262
+
         this.map = new window.AMap.Map('container', {
           zoom: 12,
           center: [initLng, initLat],
           resizeEnable: true
         })
-        // ====== 新增：手动创建工具栏控件（包含搜索框）======
+
         window.AMap.plugin(['AMap.ToolBar', 'AMap.PlaceSearch'], () => {
-          // 实例化工具栏，开启内置搜索输入框
-          const toolBar = new window.AMap.ToolBar({
+          this.toolBar = new window.AMap.ToolBar({
             position: 'LT',
-            searchBar: false, // 开启地图原生搜索框
+            searchBar: false,
             autoShow: true
           })
-          // 把控件添加到地图
-          this.map.addControl(toolBar)
+          this.map.addControl(this.toolBar)
 
-          // 你的地点搜索实例保持原有代码不变
           this.placeSearch = new window.AMap.PlaceSearch({
             city: '北京',
             pageSize: 8
           })
         })
-        // ========== 移除原固定单个DEMO marker代码，改为动态读取数据库点位 ==========
-        // 绿色图标样式保持原样
+
         const deviceIcon = new window.AMap.Icon({
           size: new window.AMap.Size(48, 64),
           image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
           imageSize: new window.AMap.Size(48, 64)
         })
 
-        // ========== 新增：从数据库加载并渲染全部绿色点位 ==========
         await this.loadDbGreenPoints(deviceIcon)
-        // 地图初始化默认中心点（项目初始坐标）
+
         const defaultLng = this.defaultLng
         const defaultLat = this.defaultLat
+
         this.createCenterMarker(defaultLng, defaultLat, '地图中心')
 
-        // 地图单击打开弹窗录入点位信息（原有逻辑完全不变）
-        this.map.on('click', (e) => {
+        this.mapClickMap = (e) => {
           if (!this.drawPointMode) return
+
           const rawLng = e.lnglat.lng.toFixed(6)
           const rawLat = e.lnglat.lat.toFixed(6)
+
           const [wgsLng, wgsLat] = this.gcj02ToWgs84(rawLng, rawLat)
-          // 填充坐标至临时表单
+
           this.tempPoint.lng = rawLng
           this.tempPoint.lat = rawLat
           this.tempPoint.wgsLng = wgsLng.toFixed(6)
           this.tempPoint.wgsLat = wgsLat.toFixed(6)
-          this.showPointDialog = true
-        })
 
-        this.map.on('dblclick', (e) => {
+          this.showPointDialog = true
+        }
+
+        this.map.on('click', this.mapClickMap)
+
+        this.mapDblClickMap = (e) => {
           const lng = e.lnglat.lng
           const lat = e.lnglat.lat
+
           const [gcjL, gcjLa] = this.wgs84ToGcj02(lng, lat)
+
           console.log('双击点位GCJ02:', gcjL, gcjLa)
-        })
+        }
+
+        this.map.on('dblclick', this.mapDblClickMap)
       } catch (err) {
         console.warn('地图加载失败', err)
       }
     },
 
-    // 新增方法：读取数据库点位渲染绿色marker
     async loadDbGreenPoints (greenIcon) {
-      // 全局唯一悬浮定时器，所有点位共用，避免冲突
-      let globalHoverTimer = null
+      // ✅ 清理旧的 hover timer
+      if (this.globalHoverTimer) {
+        clearTimeout(this.globalHoverTimer)
+        this.globalHoverTimer = null
+      }
 
       try {
-        // ========= 新增：离线灰色图标定义 =========
         const grayIcon = new window.AMap.Icon({
           size: new window.AMap.Size(48, 64),
           image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiM5OTk5OTkiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzFiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiM5OTk5OTkiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzY2NjY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
           imageSize: new window.AMap.Size(48, 64)
         })
 
-        // 先清理旧数据库点位
         this.dbGreenMarkers.forEach(item => {
-          this.map.remove(item.marker)
-          this.map.remove(item.label)
+          if (item.marker) {
+            item.marker.off('mouseover')
+            item.marker.off('mouseout')
+            item.marker.off('dblclick')
+          }
+          if (item.marker && this.map) this.map.remove(item.marker)
+          if (item.label && this.map) this.map.remove(item.label)
+          if (item.mainInfoWin) item.mainInfoWin.off('open')
+          item.marker = null
+          item.label = null
+          item.mainInfoWin = null
         })
         this.dbGreenMarkers = []
 
-        // 请求后端读取点位数据,根据用户权限，过滤设备
         let items = {}
         items.usertype = this.get_user_info.user.usertype
         items.userorg = this.get_user_info.user.userorg
-        const res = await this.instance({'url': '/localrelative', 'method': 'post', data: items})
+
+        const res = await this.instance({
+          url: '/localrelative',
+          method: 'post',
+          data: items
+        })
+
         console.log('【screen】读取的数据库/localrelative:', res.data)
+
         const dbPoints0 = res.data || []
-        // ✅ 筛选 stationtype = '1' 的点位
         const dbPoints = dbPoints0.filter(row => row.stationtype === '1')
+
         console.log('【screen】显示的地图点位:', dbPoints)
 
         dbPoints.forEach(row => {
@@ -830,24 +980,27 @@ export default {
           let gcjLat = row.gcjlat
           let gpsLng
           let gpsLat
-          // 优先兼容WGS坐标转换GCJ高德坐标
+
           if (!gcjLng || !gcjLat) {
             gpsLng = Number(row.gpslng)
             gpsLat = Number(row.gpslat)
+
             if (!gpsLng || !gpsLat) return
+
             const [gcjL, gcjLa] = this.wgs84ToGcj02(gpsLng, gpsLat)
             gcjLng = gcjL
             gcjLat = gcjLa
-            console.log('【screen】配置了GPS,无高德点位数据:', gcjLng, gcjLat)
+
+            console.log('【screen】配置了GPS，无高德点位数据:', gcjLng, gcjLat)
           }
+
           const pos = [parseFloat(gcjLng), parseFloat(gcjLat)]
 
-          // 创建地图Marker标记
           const marker = new window.AMap.Marker({
             position: pos,
             icon: grayIcon
           })
-          // 创建点位发光文字标签
+
           const textLabel = new window.AMap.Text({
             position: pos,
             text: row.label || '点位',
@@ -863,7 +1016,6 @@ export default {
             }
           })
 
-          // 自定义弹窗HTML内容
           const infoContent = `
             <div style="width:230px;color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
               <div>ID：${row.catalogid}</div>
@@ -872,7 +1024,8 @@ export default {
               <div>GCJ经纬度：${gcjLng},${gcjLat}</div>
               <div>WGS经纬度：${row.gpslng || ''},${row.gpslat || ''}</div>
               <button 
-                onclick="window.callOpenPanel('${row.catalogid}')"
+                class="device-panel-btn"
+                data-cid="${row.catalogid}"
                 style="width:100%;height:32px;margin-top:10px;border:none;border-radius:4px;background:#0a78ff;color:#fff;font-size:13px;cursor:pointer;pointer-events:auto;"
               >
                 设备控制面板
@@ -880,18 +1033,17 @@ export default {
             </div>
           `
 
-          // 实例化高德信息窗体
           const mainInfoWin = new window.AMap.InfoWindow({
             content: infoContent,
             offset: new window.AMap.Pixel(0, -55),
             anchor: 'bottom-center',
             isCustom: true,
-            closeWhenClickMap: false // 点击地图空白不会自动关闭弹窗
+            closeWhenClickMap: false
           })
 
-          // 将标记、标签、弹窗存入地图 & 数组缓存
           this.map.add(marker)
           this.map.add(textLabel)
+
           this.dbGreenMarkers.push({
             id: row.catalogid,
             name: row.label,
@@ -900,43 +1052,54 @@ export default {
             marker,
             label: textLabel,
             mainInfoWin,
-            online: false, // 默认离线，GPS推送后更新在线状态
+            online: false,
             greenIcon,
             grayIcon
           })
 
-          // 鼠标移入点位：清除关闭倒计时，打开弹窗
           marker.on('mouseover', () => {
-            clearTimeout(globalHoverTimer)
+            if (this.globalHoverTimer) {
+              clearTimeout(this.globalHoverTimer)
+              this.globalHoverTimer = null
+            }
             mainInfoWin.open(this.map, marker.getPosition())
           })
 
-          // 鼠标移出点位：500毫秒延时关闭弹窗，预留移动鼠标缓冲时间
           marker.on('mouseout', () => {
-            globalHoverTimer = setTimeout(() => {
+            this.globalHoverTimer = setTimeout(() => {
               mainInfoWin.close()
+              this.globalHoverTimer = null
             }, 500)
           })
 
-          // 弹窗打开后，绑定弹窗内部鼠标移入移出事件
           mainInfoWin.on('open', () => {
-            // 延时150ms 等待弹窗内部DOM完整渲染完毕
-            setTimeout(() => {
+            const timerId = setTimeout(() => {
               const winDom = mainInfoWin.getContentDom()
-              // 必须做空值判断
               if (!winDom) return
-
-              // 鼠标进入弹窗：彻底取消关闭定时器，弹窗常驻
-              winDom.onmouseenter = () => clearTimeout(globalHoverTimer)
-              // 鼠标离开弹窗：重新开启延时关闭
+              winDom.onmouseenter = () => {
+                if (this.globalHoverTimer) {
+                  clearTimeout(this.globalHoverTimer)
+                  this.globalHoverTimer = null
+                }
+              }
               winDom.onmouseleave = () => {
-                globalHoverTimer = setTimeout(() => {
+                this.globalHoverTimer = setTimeout(() => {
                   mainInfoWin.close()
+                  this.globalHoverTimer = null
                 }, 500)
               }
+              const btn = winDom.querySelector('.device-panel-btn')
+              if (btn) {
+                btn.onclick = (e) => {
+                  e.stopPropagation()
+                  mainInfoWin.close()
+                  this.openDevicePanel(row.catalogid)
+                }
+              }
             }, 150)
+            this.infoWinOpenTimers.push(timerId)
           })
-          // 双击点位打开设备面板（离线设备禁止打开）
+
           marker.on('dblclick', () => {
             const target = this.dbGreenMarkers.find(item => item.id === row.catalogid)
             if (!target || !target.online) {
@@ -951,27 +1114,22 @@ export default {
         console.error('读取数据库点位异常', err)
       }
     },
+
     addManualMarker (pointInfo) {
-      // 转为纯数字坐标
       const lng = parseFloat(pointInfo.lng)
       const lat = parseFloat(pointInfo.lat)
 
-      // 橙色标记（SVG base64无外网依赖）
       const orangeDeviceIcon = new window.AMap.Icon({
         size: new window.AMap.Size(48, 64),
-        image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiNmNzgwMDAiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzIwMDgwMCIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiNmNzgwMDAiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2UtZGFzaGFwPSIyIiBmaWxsPSJub25lIi8+CiAgPHJlY3QgeD0iLTYiIHk9IjM4IiB3aWR0aD0iOCIgaGVpZ2h0PSIxNiIgcng9IjIiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLWRhc2hhcD0iMiIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4=',
+        image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiNmNzgwMDAiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzIwMDgwMCIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiNmNzgwMDAiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iI2Y3ODAwMCIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjZjc4MDAwIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
         imageSize: new window.AMap.Size(48, 64)
       })
 
-      // this.marker = new window.AMap.Marker({
-      //   position: [initLng, initLat],
-      //   icon: orangeDeviceIcon
-      // })
       const marker = new window.AMap.Marker({
         position: [lng, lat],
         icon: orangeDeviceIcon
       })
-      // ====== 点位左上角文字标签======
+
       const pointTextLabel = new window.AMap.Text({
         position: [lng, lat],
         text: pointInfo.name,
@@ -984,7 +1142,7 @@ export default {
           whiteSpace: 'nowrap'
         }
       })
-      // 悬浮信息窗口
+
       const hoverInfoWin = new window.AMap.InfoWindow({
         content: `
           <div style="color:#fff;background:rgba(0,20,40,0.9);padding:8px 10px;border:1px solid #00ffff;border-radius:4px;font-size:13px;line-height:1.6;">
@@ -998,14 +1156,19 @@ export default {
         `,
         offset: new window.AMap.Pixel(0, -35)
       })
+
       marker.on('mouseover', () => {
         hoverInfoWin.open(this.map, marker.getPosition())
       })
+
       marker.on('mouseout', () => {
         hoverInfoWin.close()
       })
-      // 单击橙色图标
+
       marker.on('click', () => {
+        // ✅ 先关闭之前打开的
+        this.manualClickInfoWins.forEach(win => win.close())
+        this.manualClickInfoWins = []
         const clickInfoWin = new window.AMap.InfoWindow({
           content: `
             <div style="color:#fff;background:rgba(0,20,40,0.9);padding:10px;border:1px solid #ff7800;border-radius:4px;font-size:13px;line-height:1.7;">
@@ -1017,30 +1180,39 @@ export default {
             </div>
           `,
           offset: new window.AMap.Pixel(0, -40),
-          isCustom: true // 关键：关闭高德原生白色外壳
+          isCustom: true
         })
+
         clickInfoWin.open(this.map, marker.getPosition())
+        // ✅ 保存引用
+        this.manualClickInfoWins.push(clickInfoWin)
       })
 
-      // ✅ 存入数组（确保this指向正确Vue实例）
       this.map.add(marker)
       this.map.add(pointTextLabel)
-      this.manualMarkers.push({marker, label: pointTextLabel})
+
+      this.manualMarkers.push({ marker, label: pointTextLabel })
       this.manualPointList.push({
         ...pointInfo,
         lng: lng,
         lat: lat
       })
 
-      // ✅ 自动定位到新点位
       this.map.setZoomAndCenter(15, [lng, lat])
+
       console.log('✅ 点位添加成功', this.manualPointList, this.manualMarkers)
     },
 
     removePoint (index) {
       const item = this.manualMarkers[index]
-      this.map.remove(item.marker)
-      this.map.remove(item.label)
+      if (item.marker) {
+        item.marker.off('mouseover')
+        item.marker.off('mouseout')
+        item.marker.off('click')
+      }
+      if (item.marker && this.map) this.map.remove(item.marker)
+      if (item.label && this.map) this.map.remove(item.label)
+
       this.manualMarkers.splice(index, 1)
       this.manualPointList.splice(index, 1)
     },
@@ -1048,14 +1220,11 @@ export default {
     saveAllPoints () {
       console.log('待保存点位集合', this.manualPointList)
       this.showTip(`共${this.manualPointList.length}个点位，数据已打印控制台`)
-      // 地图点位，写入数据库
-      // axios.post('/api/savePoint', { list: this.manualPointList })
-      // insert into DB
+
       if (this.manualPointList.length > 0) {
-        // 循环遍历：拆成单条点位
         for (const point of this.manualPointList) {
-          // 单条数据结构，匹配pg字段
           let parentid = '11'
+
           const singlePoint = {
             catalogid: point.id,
             parentid: parentid,
@@ -1068,16 +1237,17 @@ export default {
             ipaddress: '',
             ipport: '',
             childrennum: '',
-            gpslng: point.wgsLng, // WGS原始经度
-            gpslat: point.wgsLat, // WGS原始纬度
-            gcjlng: point.lng, // GCJ高德经度
-            gcjlat: point.lat // GCJ高德纬度
+            gpslng: point.wgsLng,
+            gpslat: point.wgsLat,
+            gcjlng: point.lng,
+            gcjlat: point.lat
           }
-          // 提交单条接口
+
           this.saveAllPointsToDB(singlePoint)
         }
       }
     },
+
     saveAllPointsToDB (e) {
       this.instance({
         url: '/tree/addnode',
@@ -1085,63 +1255,77 @@ export default {
         data: e
       }).then(res => {
         if (res.data.code === 1) {
-          // add children node
           console.log('数据库添加树节点成功', res.data.result)
           this.$message.success('添加树节点成功')
-          // 清除this.manualPointList
         } else {
           console.log('数据库添加树节点失败', res.data.result)
-          this.$message.success('添加树节点失败')
+          this.$message.error('添加树节点失败')
         }
       })
     },
-    // 根据索引定位点位
+
     locatePointByIndex (idx) {
       const point = this.manualPointList[idx]
       const lng = parseFloat(point.lng)
       const lat = parseFloat(point.lat)
-      this.map.setZoomAndCenter(16, [lng, lat]) // zoom可按需调整
+
+      this.map.setZoomAndCenter(16, [lng, lat])
     },
+
     locatePoint () {
       if (this.manualPointList.length === 0) return
+
       const firstPoint = this.manualPointList[0]
       this.map.setCenter([firstPoint.lng, firstPoint.lat])
       this.map.setZoom(14)
     },
-    // 单击表格行：地图居中定位点位
+
     handleClickRow (deviceId) {
       const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
+
       if (!target) return this.showTip('未找到该点位')
+
       const lng = Number(target.gcjLng)
       const lat = Number(target.gcjLat)
+
       if (isNaN(lng) || isNaN(lat)) {
         return this.showTip('坐标无效')
       }
-      // 地图缩放+居中到当前点位
+
       this.map.setZoomAndCenter(16, [lng, lat])
     },
-    // 定位地图center by id
+
     locatePointByID (deviceId) {
       const target = this.dbGreenMarkers.find((d) => d.id === deviceId)
+
       if (!target) return this.showTip('未找到该点位')
+
       console.log('[screen]居中的点位信息', target)
+
       const lng = Number(target.gcjLng)
       const lat = Number(target.gcjLat)
+
       console.log('[screen]居中的点位信息lng=,lat=', lng, lat)
+
       if (isNaN(lng) || isNaN(lat)) {
         return this.showTip('坐标无效')
       }
+
       this.map.setZoomAndCenter(16, [lng, lat])
       this.remoteId = deviceId
     },
+
     gcj02ToWgs84 (gcjLon, gcjLat) {
       const PI = 3.1415926535897932384626
       const a = 6378245.0
       const ee = 0.00669342162296594323
+
       const outOfChina = (lon, lat) => {
         return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
       }
+
       if (outOfChina(gcjLon, gcjLat)) return [gcjLon, gcjLat]
+
       const transformLat = (x, y) => {
         let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
         ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
@@ -1149,6 +1333,7 @@ export default {
         ret += (160.0 * Math.sin(y / 12.0 * PI) + 320.0 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
         return ret
       }
+
       const transformLon = (x, y) => {
         let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
         ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
@@ -1156,31 +1341,39 @@ export default {
         ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0)) * 2.0 / 3.0
         return ret
       }
+
       let dLat = transformLat(gcjLon - 105.0, gcjLat - 35.0)
       let dLon = transformLon(gcjLon - 105.0, gcjLat - 35.0)
+
       const radLat = gcjLat / 180.0 * PI
       const magic = Math.sin(radLat)
       const magic2 = 1 - ee * magic * magic
       const sqrtMagic = Math.sqrt(magic2)
+
       dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic2 * sqrtMagic) * PI)
       dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
+
       const wgsLat = gcjLat - dLat
       const wgsLon = gcjLon - dLon
+
       return [wgsLon, wgsLat]
     },
+
     goDefaultCenter () {
       const lng = this.defaultLng
       const lat = this.defaultLat
+
       console.log('[screen]默认居中的点位:gcjlng=, gcjlat=', lng, lat)
+
       this.map.setZoomAndCenter(12, [lng, lat])
       this.createCenterMarker(lng, lat, '地图中心')
     },
 
-    // 创建地图中心点临时标记
     createCenterMarker (lng, lat, name) {
       this.destroyCenterMarker()
+
       const pos = new window.AMap.LngLat(lng, lat)
-      // 水滴中心点图标
+
       const dropIcon = new window.AMap.Icon({
         size: new window.AMap.Size(44, 48),
         image: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDQ0IDQ4Ij48cGF0aCBkPSJNMjIgMiBDMzIgMTIgNDAgMjcgMjIgNDYgNCAyNyAxMiAxMiAyMiAyWiIgZmlsbD0iIzAwNzZmZiIvPjxjaXJjbGUgY3g9IjIyIiBjeT0iMjgiIHI9IjYiIGZpbGw9IndoaXRlIi8+PC9zdmc+',
@@ -1191,147 +1384,139 @@ export default {
         position: pos,
         icon: dropIcon,
         zIndex: 999,
-        title: '地图中心点' // ✅ 鼠标悬浮内置tooltip
+        title: '地图中心点'
       })
+
       this.centerLabel = null
       this.map.add(this.centerMarker)
-      // this.map.add(this.centerLabel)
     },
 
-    // 销毁中心点标记
     destroyCenterMarker () {
-      if (this.centerMarker) {
+      if (this.centerMarker && this.map) {
         this.map.remove(this.centerMarker)
         this.centerMarker = null
       }
-      if (this.centerLabel) {
+
+      if (this.centerLabel && this.map) {
         this.map.remove(this.centerLabel)
         this.centerLabel = null
       }
     },
-    // update map point
+
     updateMapPointByID (data) {
-      // 根据cid查找点位数组下标
-      // const targetIndex = this.dbGreenMarkers.findIndex(item => item.id.trim() === data.cid.trim())
-      // cid不存在直接终止,加固，防止item.id 或者 data.cid 的值为 null / undefined，直接调用 .trim() 就会抛出该异常。
       if (!data || !data.cid) return
+
       const targetIndex = this.dbGreenMarkers.findIndex(item => {
         return (item.id || '').trim() === (data.cid || '').trim()
       })
+
       if (targetIndex === -1) {
         console.warn('未匹配到该点位ID：', data.cid)
         return
       }
+
       const currPoint = this.dbGreenMarkers[targetIndex]
 
-      // 校验marker正常挂载地图
       if (!currPoint.marker || !currPoint.marker.getMap()) {
         console.warn('Marker脱离地图，无法更新')
         return
       }
-
-      // 1、高德原生API 立即切换绿色在线图标
       currPoint.marker.setIcon(currPoint.greenIcon)
-      // currPoint.marker.setZIndex(99)
-      // 更新点位坐标
       currPoint.marker.setPosition([data.gcjLng, data.gcjLat])
-      if (currPoint.label) currPoint.label.setPosition([data.gcjLng, data.gcjLat])
 
-      // 2、Vue响应式更新在线状态，右侧表格同步刷新
-      this.$set(currPoint, 'online', true)
-      // 保存最新经纬度
+      if (currPoint.label) {
+        currPoint.label.setPosition([data.gcjLng, data.gcjLat])
+      }
+      currPoint.online = true
       currPoint.gcjLng = data.gcjLng
       currPoint.gcjLat = data.gcjLat
 
-      // 3、重建数组引用，强制computed列表刷新
-      this.dbGreenMarkers = [...this.dbGreenMarkers]
-
-      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅', this.dbGreenMarkers)
+      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅')
     },
-    // 定位到中心点（按钮调用）
+
     locateCenterMarker () {
       if (!this.centerMarker) {
         this.showTip('暂无实时定位标记')
         return
       }
+
       const pos = this.centerMarker.getPosition()
       this.map.setZoomAndCenter(16, [pos.lng, pos.lat])
     },
-    // ========== 新增搜索全套方法 ==========
-    // 【新增】输入框获取焦点
+
     onSearchFocus () {
       this.showDropdown = true
-      // 如果框内存在文字，立刻重新检索，刷新下拉列表
+
       if (this.searchKey.trim()) {
         this.handleSearch()
       }
     },
-    // 输入关键词执行搜索：优先级 设备 > 高德地址
+
     handleSearch () {
       const keyword = this.searchKey.trim().toLowerCase()
-      // 清空所有结果
+
       this.matchDeviceList = []
       this.matchPoiList = []
       this.totalResult = []
+
       clearTimeout(this.dropdownTimer)
+      this.dropdownTimer = null
       this.showDropdown = true
+
       if (!keyword) {
         this.showDropdown = false
         return
       }
 
-      // 第一步：优先模糊检索本地设备（ID、点位名称）
       this.matchDeviceList = this.dbGreenMarkers.filter(item => {
         const name = String(item.name || '').toLowerCase()
         const id = String(item.id).toLowerCase()
+
         return name.includes(keyword) || id.includes(keyword)
       })
 
-      // 第二步：无设备匹配，再调用高德搜索地理位置
       if (this.matchDeviceList.length === 0 && this.placeSearch) {
         this.placeSearch.search(keyword, (status, res) => {
           if (status === 'complete' && res.poiList.pois.length) {
             this.matchPoiList = res.poiList.pois
           }
+
           this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
         })
       } else {
-        // 有设备结果，不需要请求高德
         this.totalResult = [...this.matchDeviceList, ...this.matchPoiList]
       }
     },
-    // 地图空白点击，关闭搜索下拉
+
     closeSearchDropdown (e) {
-      // 获取搜索框外层dom
       const searchDom = document.querySelector('.map-search-wrap')
-      // 如果点击落在搜索框/下拉内部 → 直接return，不关闭
+
       if (searchDom && searchDom.contains(e.target)) {
         return
       }
+
       this.showDropdown = false
     },
 
-    // 选中设备：地图居中定位点位
     selectDeviceItem (device) {
       this.searchKey = device.name || device.id
       this.showDropdown = false
-      // ============【关键新增】重新执行检索，缓存最新筛选条件============
+
       this.$nextTick(() => {
         this.handleSearch()
       })
-      // 调用原有点击行定位方法，复用现有逻辑
+
       this.handleClickRow(device.id)
     },
 
-    // 选中高德地址：地图定位到地理坐标
     selectPoiItem (poi) {
       this.searchKey = poi.name
       this.showDropdown = false
+
       const [lng, lat] = poi.location.split(',')
       this.map.setZoomAndCenter(15, [Number(lng), Number(lat)])
     },
 
-    // 输入框失焦，延时关闭下拉（防止点击列表直接消失）
     hideDropdownTimer () {
       this.dropdownTimer = setTimeout(() => {
         this.showDropdown = false
@@ -1341,21 +1526,25 @@ export default {
     getHeightsWidths () {
       var contentHeight = $(window).height() - 110
       var menuHeight = $('.menubanner').outerHeight()
+
       $('.content').height(contentHeight)
       $('.orgTreeList').css('top', menuHeight)
-      $('.openTreeList').css('top', menuHeight)
+
       if ($('.orgTreeList').hasClass('treeListShow')) {
         var contentWidth = $(window).width()
         var treeWidth = $('.orgTreeList').width()
+
         $('.content').css('left', 0)
         $('.content').width(contentWidth - treeWidth)
         $('.screen-page').width(contentWidth - treeWidth)
       } else {
         var contentWidths = $(window).width()
+
         $('.content').css('left', 0)
         $('.content').width(contentWidths)
         $('.screen-page').width(contentWidths)
       }
+
       this.$nextTick(() => {
         if (this.$refs.chartLine) {
           const chart = echarts.getInstanceByDom(this.$refs.chartLine)
@@ -1374,11 +1563,13 @@ export default {
       const hh = date.getHours().toString().padStart(2, '0')
       const mm = date.getMinutes().toString().padStart(2, '0')
       const ss = date.getSeconds().toString().padStart(2, '0')
+
       this.nowTime = `${w} ${y}-${m}-${d} ${hh}:${mm}:${ss}`
     },
 
     initLineChart () {
       const myChart = echarts.init(this.$refs.chartLine)
+
       myChart.setOption({
         backgroundColor: 'transparent',
         tooltip: { trigger: 'axis' },
@@ -1403,7 +1594,7 @@ export default {
             name: '电耗',
             type: 'line',
             smooth: true,
-            data: [2.5, 2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2]
+            data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2]
           }
         ]
       })
@@ -1411,19 +1602,20 @@ export default {
   }
 }
 </script>
+
 <style scoped>
-/* 【原版基础布局，和改点位之前保持一致，不改动】 */
 .screen-page {
   height: 100%;
-  background: #0b1229!important;
+  background: #0b1229 !important;
   color: #fff;
   overflow: visible !important;
   overflow-x: hidden !important;
-  display: flex!important;
+  display: flex !important;
   flex-direction: column;
   box-sizing: border-box !important;
   width: 100%;
 }
+
 .top-bar {
   width: 100%;
   height: 40px;
@@ -1435,21 +1627,23 @@ export default {
   border-bottom: 1px solid #00ffff;
   flex-shrink: 0;
   box-sizing: border-box !important;
-  /* 相对定位，让标题以顶部栏整体居中，不被左右按钮挤压 */
   position: relative;
 }
+
 .top-left,
 .top-right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .select {
   background: #0b2a5a;
   color: #fff;
   border: 1px solid #00ffff;
   padding: 4px 8px;
 }
+
 .btn {
   background: #00ffff;
   color: #000;
@@ -1457,24 +1651,24 @@ export default {
   padding: 4px 10px;
   cursor: pointer;
 }
+
 .top-title {
-  /* 清空原有流式布局居中 */
   width: auto;
   text-align: unset;
   margin: 0;
   padding: 0;
-  /* 全局居中核心样式 */
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  white-space: nowrap; /* 文字不换行 */
+  white-space: nowrap;
   font-size: 26px;
   font-weight: 600;
   color: #00ffff;
   letter-spacing: 1.5px;
-  z-index: 2; /* 层级高于两侧按钮，不会被遮挡 */
+  z-index: 2;
 }
+
 .time {
   color: #00ffff;
   margin-left: 10px;
@@ -1492,6 +1686,7 @@ export default {
   box-sizing: border-box;
   width: 100% !important;
 }
+
 .left-box {
   width: 18%;
   min-width: 220px;
@@ -1499,10 +1694,12 @@ export default {
   flex-direction: column;
   gap: 15px;
 }
+
 .center-box {
   flex: 1;
   min-width: 0;
 }
+
 .right-box {
   width: 19%;
   min-width: 240px;
@@ -1514,12 +1711,14 @@ export default {
   padding: 0;
   box-sizing: border-box;
   position: relative;
-  background-color: #0b1229!important;
+  background-color: #0b1229 !important;
   flex: 1;
 }
+
 .m-top {
   margin-top: 15px;
 }
+
 .panel-title {
   text-align: center;
   color: #00ffff;
@@ -1533,9 +1732,11 @@ export default {
   gap: 20px 12px;
   padding: 8px 12px;
 }
+
 .stat-card {
   text-align: center;
 }
+
 .stat-card .num {
   font-size: 36px;
   color: #00ffff;
@@ -1544,11 +1745,13 @@ export default {
   text-shadow: 0 0 8px rgba(0,255,255,0.6);
   font-family: "DS-Digital", "LED Digital", monospace;
 }
+
 .stat-card .unit {
   font-size: 20px;
   color: #00ffff;
   margin: 4px 0;
 }
+
 .stat-card .label {
   font-size: 22px;
   color: #fff;
@@ -1563,6 +1766,7 @@ export default {
   color: #fff;
   padding: 0 12px;
 }
+
 .input-month {
   background: #0b2a5a;
   color: #fff;
@@ -1570,23 +1774,26 @@ export default {
   padding: 4px 8px;
   font-size: 16px;
 }
+
 .chart-title {
   color: #ff9500;
   font-size: 18px;
   margin-bottom: 8px;
   padding: 0 12px;
 }
+
 .chart {
   width: 100%;
   box-sizing: border-box;
   padding: 0 8px;
-  min-height: 200px; /* 保底高度防止塌陷 */
+  min-height: 200px;
 }
 
 .map-panel {
   padding: 0 !important;
   height: 100% !important;
 }
+
 .map-box {
   width: calc(100% - 20px) !important;
   height: calc(100% - 10px) !important;
@@ -1606,26 +1813,31 @@ export default {
   padding: 6px;
   box-sizing: border-box;
 }
+
 .device-table {
   width: calc(100% - 20px);
   margin: 0 10px;
   border-collapse: collapse;
   font-size: 14px;
 }
+
 .device-table th,
 .device-table td {
   border: 1px solid #00ffff;
   padding: 8px;
   text-align: center;
 }
+
 .device-table th {
   background: #023a70;
   color: #00ffff;
 }
+
 .offline {
   color: #ff2a2a;
   font-weight: bold;
 }
+
 .online {
   color: #00ff66;
   font-weight: bold;
@@ -1640,26 +1852,21 @@ export default {
   z-index: 9999 !important;
   overflow: hidden !important;
 }
+
 .screen-full .content-screen {
   height: calc(100% - 60px) !important;
   padding-bottom: 15px !important;
 }
-/**/
-/* .screen-full .orgTreeList {
-  z-index: 99999 !important;
-}
-.screen-full .openTreeList {
-  z-index: 99999 !important;
-} */
-/* ====== 仅追加点位相关样式（不改动原有左侧布局！）====== */
+
 .map-tool-bar {
   position: absolute;
-  top: 10px !important;  /* 10px → 20px，整体向下偏移10px，和顶部搜索框纵向对齐更协调 */
+  top: 10px !important;
   left: 10px;
   z-index: 999;
   display: flex;
   gap: 8px;
 }
+
 .tool-btn {
   background: #0a78ff;
   color: #fff;
@@ -1667,12 +1874,15 @@ export default {
   padding: 5px 10px;
   border-radius: 3px;
 }
+
 .tool-btn.active {
   background: #ff7800;
 }
+
 .clear-btn {
   background: #666;
 }
+
 .save-btn {
   background: #00c48c;
 }
@@ -1688,11 +1898,13 @@ export default {
   z-index: 998;
   min-width: 220px;
 }
+
 .list-title {
   color: #ff7800;
   font-weight: bold;
   margin-bottom: 8px;
 }
+
 .point-item {
   display: flex;
   justify-content: space-between;
@@ -1700,6 +1912,7 @@ export default {
   font-size: 12px;
   padding: 3px 0;
 }
+
 .point-item button {
   background: #f33;
   border: none;
@@ -1720,6 +1933,7 @@ export default {
   align-items: center;
   justify-content: center;
 }
+
 .point-dialog {
   width: 440px;
   background: #0b1229;
@@ -1727,21 +1941,25 @@ export default {
   padding: 24px;
   border-radius: 6px;
 }
+
 .dialog-header {
   font-size: 20px;
   color: #00ffff;
   text-align: center;
   margin-bottom: 20px;
 }
+
 .form-row {
   display: flex;
   align-items: center;
   margin-bottom: 16px;
 }
+
 .form-row label {
   width: 95px;
   color: #fff;
 }
+
 .form-row input {
   flex: 1;
   height: 36px;
@@ -1750,35 +1968,37 @@ export default {
   color: #fff;
   padding: 0 10px;
 }
+
 .dialog-btns {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 24px;
 }
+
 .btn-cancel {
   padding: 6px 16px;
   background: #555;
   border: none;
   color: #fff;
 }
+
 .btn-confirm {
   padding: 6px 16px;
   background: #00c48c;
   border: none;
   color: #000;
 }
-/*type-select*/
+
 .point-type-select {
   flex: 1;
   height: 36px;
-  background: #0b2a5a; /* 蓝底，和整体一致 */
+  background: #0b2a5a;
   border: 1px solid #00ffff;
   color: #fff;
   padding: 0 10px;
   font-size: 16px;
   box-sizing: border-box;
-  /* 可选自定义下拉箭头 */
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml;utf8,<svg fill='cyan' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
@@ -1786,45 +2006,29 @@ export default {
   background-position: right 10px center;
   padding-right: 30px;
 }
-/* 地图中心点 */
-.map-locate-btn {
-  height: 34px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 4px;
-  background: #0a78ff;
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  display:inline-flex;
-  align-items:center;
-}
-.map-locate-btn:hover {
-  background: #0866dd;
-}
-/*眼睛全局看板*/
+
 .map-top-btn {
   height: 36px;
   width: 100px;
   padding: 0 12px;
   border: none;
-  border-radius: 3px; /* 圆角收小一点 */
+  border-radius: 3px;
   background-color: #0a78ff;
   color: #ffffff;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 加深阴影适配深色背景 */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   white-space: nowrap;
 }
+
 .map-top-btn:hover {
   background-color: #0767dd;
 }
-/* 自定义弹窗样式*/
+
 .tip-mask {
   position: fixed;
   top: 0;
@@ -1837,6 +2041,7 @@ export default {
   align-items: center;
   justify-content: center;
 }
+
 .tip-box {
   background: #0b1229;
   border: 1px solid #00ffff;
@@ -1845,10 +2050,12 @@ export default {
   color: #fff;
   text-align: center;
 }
+
 .tip-box p {
   margin: 0 0 16px;
   line-height: 1.7;
 }
+
 .tip-btn {
   padding: 5px 18px;
   background: #0a78ff;
@@ -1857,61 +2064,61 @@ export default {
   border-radius: 3px;
   cursor: pointer;
 }
-/* ========== 地图搜索框自定义样式【已修改：对齐右侧map-top-btn蓝色按钮样式】 ========== */
+
 .map-search-wrap {
   position: absolute;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  width: 260px; /* 改动：宽度由460px → 420px */
+  width: 260px;
   z-index: 1005;
 }
-/* Vue2 scoped必须 /deep/ 穿透ElementUI内部DOM */
+
 /deep/ .map-search-wrap .el-input__inner {
-  height: 36px; /* 改动：高度42px → 36px 和按钮等高 */
-  line-height: 36px; /* 新增：文字垂直居中 */
-  background-color: #0a78ff; /* 改动：半透明深蓝 → 按钮纯色蓝底色 */
-  border: none; /* 改动：取消青蓝色边框 */
-  border-radius: 3px; /* 改动：圆角8px → 3px 和按钮圆角一致 */
+  height: 36px;
+  line-height: 36px;
+  background-color: #0a78ff;
+  border: none;
+  border-radius: 3px;
   color: #ffffff;
-  font-size: 14px; /* 改动：字号15px→14px */
-  padding-left: 42px; /* 新增：左侧留白放搜索图标 */
+  font-size: 14px;
+  padding-left: 42px;
   padding-right: 16px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.45); /* 改动：阴影替换为按钮同款阴影 */
-  transition: background-color 0.2s ease; /* 新增：背景色过渡动画 */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+  transition: background-color 0.2s ease;
 }
-/* 搜索前置图标变白 */
+
 /deep/ .map-search-wrap .el-input__prefix {
   color: #fff;
   left: 14px;
 }
-/* 占位符文字半透明白色 */
+
 /deep/ .map-search-wrap .el-input__inner::placeholder {
   color: rgba(255, 255, 255, 0.72);
 }
-/* 悬浮hover效果 同按钮 */
+
 /deep/ .map-search-wrap .el-input__inner:hover {
   background-color: #0767dd;
 }
-/* 输入框聚焦样式 */
+
 /deep/ .map-search-wrap .el-input__inner:focus {
   background-color: #065bc9;
   box-shadow: 0 0 0 2px rgba(10, 120, 255, 0.35), 0 2px 6px rgba(0,0,0,0.45);
 }
-/* 清除浏览器默认聚焦轮廓 */
+
 /deep/ .map-search-wrap .el-input__inner:focus-visible {
   outline: none;
 }
-/* 清空按钮颜色适配白色主题 */
+
 /deep/ .map-search-wrap .el-input__clear {
   color: rgba(255,255,255,0.8);
 }
-/* 高德原生工具栏整体下移 */
+
 /deep/ .amap-toolbar {
   top: 40px !important;
   left: 16px !important;
 }
-/* 下拉结果面板：全部沿用原有样式，无任何修改 */
+
 .search-dropdown-panel {
   margin-top: 6px;
   background: rgba(11, 18, 41, 0.96);
@@ -1920,34 +2127,40 @@ export default {
   max-height: 340px;
   overflow-y: auto;
 }
+
 .dropdown-group-title {
   padding: 8px 16px;
   font-size: 12px;
   color: #00ffff;
   background: rgba(0, 60, 120, 0.3);
 }
+
 .dropdown-item {
   padding: 10px 16px;
   cursor: pointer;
   transition: background 0.2s;
 }
+
 .dropdown-item:hover {
   background: rgba(0, 255, 255, 0.15);
 }
+
 .item-name {
   font-size: 14px;
   color: #ffffff;
 }
+
 .item-desc {
   font-size: 12px;
   color: #99ccdd;
   margin-top: 3px;
 }
+
 .device-item .item-name {
   color: #00ff66;
 }
+
 .poi-item .item-name {
   color: #00ffff;
 }
-
 </style>
