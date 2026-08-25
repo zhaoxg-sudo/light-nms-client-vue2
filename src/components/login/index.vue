@@ -29,7 +29,8 @@
             <div class=" col-sm-12">
               <div class="checkbox">
                 <label>
-                  <input type="checkbox" v-model="rememberPassword" @click="(() => { rememberPassword = !rememberPassword })"> 记住密码
+                  <!-- <input type="checkbox" v-model="rememberPassword" @click="(() => { rememberPassword = !rememberPassword })"> 记住密码 -->
+                  <input type="checkbox" v-model="rememberPassword"> 记住密码
                 </label>
               </div>
             </div>
@@ -130,7 +131,16 @@ export default {
           // 修复：原代码setTimeout立即执行跳转的错误
           setTimeout(() => {
             this.$router.push({path: '/'})
-          }, 2000)
+          }, 500)
+          // 缩短延时，并且增加时间戳强制触发路由更新，解决Layout不刷新
+          // setTimeout(() => {
+          //   this.$router.replace({
+          //     path: '/',
+          //     query: {
+          //       _t: Date.now()
+          //     }
+          //   })
+          // }, 300)
         } else {
           this.showTip('账号或密码错误')
         }

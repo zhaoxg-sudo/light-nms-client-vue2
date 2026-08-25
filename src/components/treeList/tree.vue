@@ -24,19 +24,6 @@ import {GET_USER_INFO} from '@/store/getters/type.js'
 export default {
   data () {
     return {
-      /* data: [
-        {'catalogId': 58, 'parentId': -1, 'name': '一级目录1'},
-        {'catalogId': 59, 'parentId': 58, 'name': '二级目录1'},
-        {'catalogId': 60, 'parentId': 59, 'name': '三级目录1'},
-        {'catalogId': 61, 'parentId': 59, 'name': '三级目录2'},
-        {'catalogId': 62, 'parentId': 59, 'name': '三级目录3'},
-        {'catalogId': 63, 'parentId': 59, 'name': '三级目录4'},
-        {'catalogId': 64, 'parentId': 58, 'name': '二级目录2'},
-        {'catalogId': 65, 'parentId': 64, 'name': '三级目录5'},
-        {'catalogId': 66, 'parentId': 64, 'name': '三级目录6'},
-        {'catalogId': 67, 'parentId': -1, 'name': '一级目录2'},
-        {'catalogId': 68, 'parentId': 67, 'name': '二级目录3'}
-      ], */
       data: [
         {'catalogId': 1, 'parentId': -1, 'name': '站点设备树'},
         {'catalogId': 58, 'parentId': 1, 'name': '棋盘梁隧道1'},
@@ -67,16 +54,31 @@ export default {
   computed: {
     ...mapGetters({
       get_user_info: GET_USER_INFO
-    })
+    }),
+    // 实时从vuex读取用户信息
+    currentUser () {
+      return this.get_user_info.user
+    }
   },
-  created () {
-    this.$nextTick(function () {
-      // this.actionGetCatalog()
-      // console.log('[tree]this.get_user_info=', this.get_user_info)
-      this.userType = this.get_user_info.user.usertype
-      this.userOrg = this.get_user_info.user.userorg
-      this.refresh()
-    })
+  watch: {
+    // 监听用户对象变化；退出登录/切换账号，自动重载树
+    currentUser: {
+      handler (newUser) {
+        if (!newUser) {
+          // 用户为空(退出登录)，清空树
+          this.treeData = []
+          this.defaultExpanded = []
+          return
+        }
+        this.userType = newUser.usertype
+        this.userOrg = newUser.userorg
+        // 先清空旧展开列表，避免残留
+        this.defaultExpanded = []
+        this.refresh()
+      },
+      deep: true,
+      immediate: true // 首次进入页面立刻加载一次树
+    }
   },
   methods: {
     ...mapActions([
@@ -84,13 +86,10 @@ export default {
       'setInitData'
     ]),
     clearTreeFocus () {
-      // 1. 页面body获取焦点，抢占全局焦点
       document.body.focus()
-      // 2. 清空当前激活元素
       if (document.activeElement) {
         document.activeElement.blur()
       }
-      // 3. 清空所有带focus-within的节点缓存状态
       document.querySelectorAll('.el-tree-node:focus-within').forEach(el => {
         el.blur()
       })
@@ -99,24 +98,17 @@ export default {
       let items = {}
       items.usertype = this.userType
       items.userorg = this.userOrg
-      // console.log('[tree] items=', items)
-      this.userType = this.get_user_info.user.usertype
       this.instance({
         url: 'localrelative',
         method: 'post',
         data: items
       }).then((res) => {
         console.log('从数据库读取的catalog数据=', res.data)
-        // let data = res.data
         this.treeData = this.actionGetCatalog(res.data)
-        // this.treeData = this.actionGetCatalog(this.data)
         let data = this.treeData
-        // this.data = data
         console.log(data[0]['label'])
-        // 初始化树对象
         this.TreeChange({data: data[0], node: {}})
 
-        //  循环出默认展开项的ID
         for (let i in data) {
           this.defaultExpanded.push(data[i]['label'])
         }
@@ -128,29 +120,6 @@ export default {
         console.error('localrelative请求异常', err)
       })
     },
-    // refresh () {
-    //   this.$ajax.get(this.$appHost + '/localall')
-    //     .then((res) => {
-    //       console.log('从数据库读取的catalog数据=', res.data)
-    //       // let data = res.data
-    //       this.treeData = this.actionGetCatalog(res.data)
-    //       // this.treeData = this.actionGetCatalog(this.data)
-    //       let data = this.treeData
-    //       // this.data = data
-    //       console.log(data[0]['label'])
-    //       // 初始化树对象
-    //       this.TreeChange({data: data[0], node: {}})
-
-    //       //  循环出默认展开项的ID
-    //       for (let i in data) {
-    //         this.defaultExpanded.push(data[i]['label'])
-    //       }
-    //       this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
-    //       this.$nextTick(() => {
-    //         this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
-    //       })
-    //     })
-    // },
     handleNodeClick (data, node, event) {
       setTimeout(() => {
         document.body.focus()
@@ -158,12 +127,11 @@ export default {
       }, 0)
       console.log('node click 事件.................................')
       console.log(node.id, data.label)
-      if (event) { // 判断点击的是否为默认选中的树节点，如果不是，取消默认选中
+      if (event) {
         if (node.id !== this.$refs.tree.$children[0].node.id) {
           this.$refs.tree.$children[0].$el.className = 'el-tree-node'
         }
       }
-      // 提交树对象，以及当前点击树菜单的数据至仓库
       this.$emit('click')
       this.TreeChange({data, node})
     },
@@ -176,11 +144,6 @@ export default {
     actionGetCatalog (data) {
       let tree = []
       console.log('actionGetCatalog!')
-      /* 把"name"换成"label"
-      for (let i = 0; i < data.length; i++) {
-        data[i].label = data[i].name
-        delete data[i].name
-      } */
       console.log('原始data', data)
       tree = this.getJsonTree(data, {
         id: 'catalogid',
@@ -209,14 +172,12 @@ export default {
           jsonTree.push(v)
         }
       })
-      // 循环遍历给tree加图标
       this.treeAddIcon(jsonTree)
       return jsonTree
     },
     treeAddIcon (data) {
       for (let i = 0; i < data.length; i++) {
         if (data[i].children) {
-          // icon来自阿里巴巴矢量图标库http://iconfont.cn
           data[i].icon = 'iconfont icon-wenjianjia'
           this.treeAddIcon(data[i].children)
         } else {
@@ -225,7 +186,6 @@ export default {
       }
     }
   }
-
 }
 </script>
 <style lang="scss" scoped>
@@ -233,42 +193,39 @@ export default {
     background:#313439;
 }
 .custom-tree-node {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 14px;
-    margin-left: 5px;
-  }
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-left: 5px;
+ }
 .operation{
-    float:right;
+  float:right;
 }
 i {
-    margin:0px 5px;
+ margin:0px 5px;
 }
 ::v-deep .el-tree {
   background: transparent !important;
 }
 
-// 箭头图标聚焦清除白边
-::v-deep .el-tree-node\_\_expand-icon:focus,
-::v-deep .el-tree-node\_\_expand-icon:focus-visible {
+::v-deep .el-tree-node__expand-icon:focus,
+::v-deep .el-tree-node__expand-icon:focus-visible {
   outline: none !important;
   outline-offset: 0;
 }
 
-// 节点容器全部聚焦清除
-::v-deep .el-tree-node \*:focus,
-::v-deep .el-tree-node \*:focus-visible {
+::v-deep .el-tree-node *:focus,
+::v-deep .el-tree-node *:focus-visible {
   outline: 0 !important;
   box-shadow: none !important;
 }
 
-// 取消选中高亮、悬浮高亮
-::v-deep .el-tree-node.is-current > .el-tree-node\_\_content {
+::v-deep .el-tree-node.is-current > .el-tree-node__content {
   background: transparent !important;
 }
-::v-deep .el-tree-node\_\_content:hover {
+::v-deep .el-tree-node__content:hover {
   background: transparent !important;
 }
 </style>
