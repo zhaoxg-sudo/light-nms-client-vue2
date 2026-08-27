@@ -88,6 +88,11 @@ export default {
       this.refresh()
     })
   },
+  activated () {
+    console.log('[tree] 组件激活，刷新树数据')
+    this.poweredID = this.get_user_info.poweredID
+    this.refresh()
+  },
   methods: {
     ...mapActions([
       'TreeChange',
@@ -145,86 +150,6 @@ export default {
         }, 100)
       })
     },
-    // // 默认选中租户node
-    // setActiveOrgNode () {
-    //   const userInfo = this.get_user_info.user
-    //   if (!userInfo || userInfo.usertype === '-1') return
-    //   const targetCid = String(userInfo.userorg).trim()
-    //   if (!targetCid || targetCid === '-1') return
-    //   if (!Array.isArray(this.treeData) || this.treeData.length === 0) {
-    //     return
-    //   }
-    //   if (!this.$refs || !this.$refs.tree) {
-    //     return
-    //   }
-
-    //   const findNodeByCid = (treeArr, cid) => {
-    //     for (let item of treeArr) {
-    //       if (String(item.catalogid).trim() === cid) {
-    //         return item
-    //       }
-    //       if (item.children && item.children.length > 0) {
-    //         const res = findNodeByCid(item.children, cid)
-    //         if (res) return res
-    //       }
-    //     }
-    //     return null
-    //   }
-    //   const targetNode = findNodeByCid(this.treeData, targetCid)
-    //   console.log('✅ 从this.treeData找到租户节点树节点=✅ ', targetCid, targetNode)
-    //   if (!targetNode) {
-    //     console.warn('setActiveOrgNode 未找到userorg对应树节点', targetCid)
-    //     return
-    //   }
-
-    //   // 递归收集所有父节点label，存入defaultExpanded
-    //   const collectParentLabel = (node, arr) => {
-    //     if (!node) return
-    //     const nodeObj = this.$refs.tree.getNode(node.label)
-    //     if (nodeObj && nodeObj.parent && nodeObj.parent.label) {
-    //       arr.push(nodeObj.parent.label)
-    //       collectParentLabel(nodeObj.parent.data, arr)
-    //     }
-    //   }
-    //   const expandList = []
-    //   collectParentLabel(targetNode, expandList)
-    //   // 响应式覆盖defaultExpanded
-    //   this.defaultExpanded = expandList
-    //   console.log('✅ 递归收集所有父节点label=✅ ', expandList)
-
-    //   this.$nextTick(() => {
-    //     setTimeout(() => {
-    //       if (!this.$refs.tree) return
-    //       this.$refs.tree.setCurrentKey(targetNode.label)
-    //       const treeNode = this.$refs.tree.getNode(targetNode.label)
-    //       console.log('🔥 treeNode🔥', targetNode, treeNode)
-    //       this.TreeChange({data: targetNode, node: treeNode})
-    //       this.$emit('click')
-    //       console.log('🔥 this.$emit click🔥')
-    //     }, 200)
-    //   })
-    // },
-    // refresh () {
-    //   this.$ajax.get(this.$appHost + '/localall')
-    //     .then((res) => {
-    //       console.log('从数据库读取的catalog数据=', res.data)
-    //       this.treeData = this.actionGetCatalog(res.data)
-    //       let data = this.treeData
-    //       // let data = res.data.result
-    //       // this.data = data
-    //       console.log(data[0]['label'])
-    //       // 初始化树对象
-    //       this.TreeChange({data: data[0], node: {}})
-    //       // 循环出默认展开项的ID
-    //       for (let i in data) {
-    //         this.defaultExpanded.push(data[i]['label'])
-    //       }
-    //       this.TreeChange({data: data[0], node: this.$refs.tree.$children[0]})
-    //       this.$nextTick(() => {
-    //         this.$refs.tree.$children[0].$el.className = this.$refs.tree.$children[0].$el.className + ' ' + 'is-current'
-    //       })
-    //     })
-    // },
     refresh () {
       let items = {}
       items.usertype = this.get_user_info.user.usertype
@@ -247,6 +172,8 @@ export default {
         this.TreeChange({data: data[0], node: {}})
 
         //  循环出默认展开项的ID
+        // 清空后重新设置默认展开项
+        this.defaultExpanded = []
         for (let i in data) {
           this.defaultExpanded.push(data[i]['label'])
         }

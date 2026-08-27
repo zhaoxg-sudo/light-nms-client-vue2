@@ -131,7 +131,7 @@ export default {
           // 修复：原代码setTimeout立即执行跳转的错误
           setTimeout(() => {
             this.$router.push({path: '/'})
-          }, 500)
+          }, 300)
           // 缩短延时，并且增加时间戳强制触发路由更新，解决Layout不刷新
           // setTimeout(() => {
           //   this.$router.replace({
