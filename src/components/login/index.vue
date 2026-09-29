@@ -56,7 +56,8 @@ export default {
       formData: {
         account: '',
         password: '',
-        orgtype: ''
+        orgtype: '',
+        fullname: ''
       },
       rememberPassword: false,
       instance: this.$ajax.create({

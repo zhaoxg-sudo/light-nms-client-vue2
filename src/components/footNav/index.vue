@@ -5,7 +5,7 @@
         <span>Hi {{username}}<a @click="logout()"> [退出]</a>
           <a v-if="showSetting" @click="setting()"><i class="fa fa-cogs"></i>配置管理</a>
           <a @click="$router.go(0)"><i class="fa fa-refresh"></i>刷新页面</a>
-          &nbsp;  &nbsp;&nbsp;  &nbsp;&nbsp; v0.2.7 2026.0827 baseline-memory-leak
+          &nbsp;  &nbsp;&nbsp;  &nbsp;&nbsp; v0.2.7 2026.0831 baseline-memory-leak
         </span>
       </div>
     </div>
