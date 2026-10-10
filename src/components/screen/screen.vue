@@ -10,6 +10,7 @@
         <button class="btn" :style="{background: onlyMapMode ? '#00c48c' : '#00ffff'}" @click="switchOnlyMap">
           {{ onlyMapMode ? '退出全地图' : '全地图' }}
         </button>
+        <button class="btn" @click="openOperLog">日志</button>
       </div>
     </div>
 
@@ -168,7 +169,7 @@
 
       <DeviceControlPanel :visible.sync="showDevicePanel" :remoteId="remoteId" />
       <MainControlPanel :visible="showMainPanel" @close="showMainPanel = false" />
-
+      <OperLogPanel :visible.sync="operLogVisible" />
       <div class="point-mask" v-if="showPointDialog">
         <div class="point-dialog">
           <div class="dialog-header">新增点位</div>
@@ -207,13 +208,14 @@ import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
 import DeviceControlPanel from './devicepanel.vue'
 import MainControlPanel from './mainControlPanel.vue'
+import OperLogPanel from './operLogPanel.vue'
 import { getHeight } from '@/utils/height.js'
 import { mapGetters } from 'vuex'
 import { GET_USER_INFO } from '@/store/getters/type'
 
 export default {
   name: 'Screen',
-  components: { borderBox1, DeviceControlPanel, MainControlPanel },
+  components: { borderBox1, DeviceControlPanel, MainControlPanel, OperLogPanel },
 
   data () {
     return {
@@ -228,6 +230,7 @@ export default {
       lastGps: null,
       showDevicePanel: false,
       showMainPanel: false,
+      operLogVisible: false,
       isFullScreen: false,
       manualPointList: [],
       manualMarkers: [],
@@ -400,6 +403,9 @@ export default {
   sockets: {},
 
   methods: {
+    openOperLog () {
+      this.operLogVisible = true
+    },
     destroyAllMapOverlay () {
       this.infoWinOpenTimers.forEach(id => clearTimeout(id))
       this.infoWinOpenTimers = []

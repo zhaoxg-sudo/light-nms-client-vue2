@@ -29,7 +29,7 @@
             </div>
             <div class="card-content">
               <div class="card-num">1</div>
-              <div class="card-label">在线网关</div>
+              <div class="card-label">4G在线</div>
               <div class="card-rate green">100.00%在线率</div>
             </div>
           </div>
@@ -39,7 +39,7 @@
             </div>
             <div class="card-content">
               <div class="card-num">1</div>
-              <div class="card-label">总网关数</div>
+              <div class="card-label">总4G数</div>
               <div class="card-desc">所有区域网关</div>
             </div>
           </div>
