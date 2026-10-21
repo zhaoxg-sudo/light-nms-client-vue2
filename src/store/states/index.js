@@ -19,5 +19,7 @@ export default {
   // 点击树菜单的 obj
   TreeObj: {},
   // 联动map set new point
-  updatePoint: {}
+  updatePoint: {},
+  deviceonoffline: {},
+  gpschannelonoffline: {}
 }

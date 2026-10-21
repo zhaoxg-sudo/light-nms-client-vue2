@@ -19,6 +19,12 @@ export default {
   updatePoint ({commit}, val) {
     commit('UPDATEPOINT', val)
   },
+  deviceonoffline ({commit}, val) {
+    commit('DEVICEONOFFLINE', val)
+  },
+  gpschannelonoffline ({commit}, val) {
+    commit('GPSCHANNELONOFFLINE', val)
+  },
   // 报警
   alarmReport ({commit}, val) {
     commit('ALARMREPORT', val)

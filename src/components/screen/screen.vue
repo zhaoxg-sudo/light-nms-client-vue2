@@ -19,7 +19,7 @@
       <!-- 左侧 -->
       <div class="left-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
-          <div class="panel-title"> 项目统计 </div>
+          <div class="panel-title"> 总览 </div>
           <div class="stat-grid">
             <div class="stat-card">
               <div class="num">0.23</div>
@@ -148,7 +148,7 @@
 
       <div class="right-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
-          <div class="panel-title">设备列表</div>
+          <div class="panel-title">设备</div>
           <el-input type="text" class="search-input" placeholder="搜索名称/ID" v-model="deviceSearch" clearable prefix-icon="el-icon-search" />
           <table class="device-table">
             <thead>
@@ -272,7 +272,14 @@ export default {
   },
 
   computed: {
-    ...mapGetters({ get_user_info: GET_USER_INFO, TreeData: 'TreeData', updatePoint: 'updatePoint', btnList: 'getBtnList' }),
+    ...mapGetters({
+      get_user_info: GET_USER_INFO,
+      TreeData: 'TreeData',
+      updatePoint: 'updatePoint',
+      btnList: 'getBtnList',
+      deviceonoffline: 'deviceonoffline',
+      gpschannelonoffline: 'gpschannelonoffline'
+    }),
     hasPointEditPerm () { return this.userPermissions.includes('point:edit') },
     userPermissions () {
       const usertype = this.get_user_info && this.get_user_info.user && this.get_user_info.user.usertype
@@ -313,7 +320,31 @@ export default {
         console.log('[screen] store->updatePoint :=', data)
         if (!data || !data.cid) return
         this.updateMapPointByID(data)
-      }
+      },
+      deep: true
+    },
+    'deviceonoffline': {
+      handler (data) {
+        console.log('[screen] store->deviceonoffline :=', data)
+        if (!data || !data.cid) return
+        // this.updateDeviceStatus(data)
+        // 只找当前这一个marker，单点更新，不循环全部
+        // console.log('[screen] store->deviceonoffline this.dbGreenMarkers:=', this.dbGreenMarkers)
+        const targetMarker = this.dbGreenMarkers.find(m => m.id === data.cid)
+        if (targetMarker) {
+          targetMarker.online = (data.status === 'online')
+          console.log('[screen] deviceonoffline 在线状态改变，点位cid=', data.cid, data.status)
+        }
+      },
+      deep: true
+    },
+    'gpschannelonoffline': {
+      handler (data) {
+        console.log('[screen] store->gpschannelonoffline :=', data)
+        // if (!data || !data.cid) return
+        // this.updateGpsChannelStatus(data)
+      },
+      deep: true
     }
   },
 
@@ -522,7 +553,7 @@ export default {
         // 2. 重新加载数据库点位
         const deviceIcon = this.createDeviceIcon()
         await this.loadDbGreenPoints(deviceIcon)
-
+        await this.loadDeviceStatus()
         // 3. 重建中心标记
         this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
 
@@ -534,6 +565,19 @@ export default {
         console.error('刷新失败', err)
         this.$message.error('刷新失败，请检查网络或地图服务')
       }
+    },
+    async loadDeviceStatus () {
+      const res = await this.instance({ url: '/api/tcp/devicelist', method: 'get' })
+      console.log('【screen】读取的数据库设备列表/api/tcp/devicelist:', res.data)
+      // 修改在线状态
+      const list = res.data.list || []
+      // 初始化：把接口返回的status同步到dbGreenMarkers的online
+      this.dbGreenMarkers.forEach(marker => {
+        const findDev = list.find(item => item.cid === marker.id)
+        if (findDev) {
+          marker.online = findDev.status === 'online'
+        }
+      })
     },
     createDeviceIcon () {
       return new window.AMap.Icon({
@@ -682,6 +726,7 @@ export default {
         // })
 
         await this.loadDbGreenPoints(deviceIcon)
+        await this.loadDeviceStatus()
         if (this.isDestroyed) return
 
         this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
@@ -1086,7 +1131,7 @@ export default {
       currPoint.marker.setIcon(currPoint.greenIcon)
       currPoint.marker.setPosition([data.gcjLng, data.gcjLat])
       if (currPoint.label) currPoint.label.setPosition([data.gcjLng, data.gcjLat])
-      currPoint.online = true
+      // currPoint.online = true 20261020 cancel
       currPoint.gcjLng = data.gcjLng
       currPoint.gcjLat = data.gcjLat
       console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅')

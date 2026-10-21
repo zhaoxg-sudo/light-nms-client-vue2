@@ -9,13 +9,19 @@
     @close="handleClose"
     custom-class="dark-dialog"
   >
+  <!-- ✅ 新增标题插槽，文字居中，对齐devicepanel样式 -->
+  <template slot="title">
+    <div style="width:100%;text-align:center;">
+      <span style="font-size:22px;font-weight:bold;color:#40c9ff;letter-spacing:2px;">操作日志</span>
+    </div>
+  </template>
     <!-- 查询表单 -->
     <el-form :model="query" inline ref="queryForm">
       <el-form-item label="用户名">
         <el-input v-model="query.user_name" placeholder="请输入用户名" clearable></el-input>
       </el-form-item>
-      <el-form-item label="用户组织">
-        <el-input v-model="query.user_org" placeholder="请输入用户组织" clearable></el-input>
+      <el-form-item label="租户名">
+        <el-input v-model="query.user_org" placeholder="请输入租户名" clearable></el-input>
       </el-form-item>
       <el-form-item label="操作时间">
         <el-date-picker
@@ -47,7 +53,7 @@
     >
       <!-- <el-table-column label="ID" prop="id" width="70"></el-table-column> -->
       <el-table-column label="用户名" prop="user_name" width="120"></el-table-column>
-      <el-table-column label="用户组织" prop="user_org" width="140"></el-table-column>
+      <el-table-column label="租户名" prop="user_org" width="140"></el-table-column>
       <el-table-column label="操作类型" prop="oper_type" width="90"></el-table-column>
       <el-table-column label="操作描述" prop="oper_desc"></el-table-column>
       <el-table-column label="请求地址" prop="request_url"></el-table-column>
@@ -90,7 +96,7 @@
       :total="page.total"
       style="margin-top:12px;text-align:right;"
       class="dark-pagination"
-><span slot="total">共 {{ page.total }} 条，共 {{ Math.ceil(page.total / page.page_size) }} 页</span>
+>
 </el-pagination>
   </el-dialog>
 </template>

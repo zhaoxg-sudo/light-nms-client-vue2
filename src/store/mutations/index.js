@@ -20,6 +20,12 @@ export default {
   UPDATEPOINT (state, val) {
     state.updatePoint = val
   },
+  DEVICEONOFFLINE (state, val) {
+    state.deviceonoffline = val
+  },
+  GPSCHANNELONOFFLINE (state, val) {
+    state.gpschannelonoffline = val
+  },
   ALARMREPORT (state, val) {
     state.alarmReport = val
   },

@@ -16,6 +16,12 @@ export default {
   updatePoint: state => {
     return state.updatePoint
   },
+  deviceonoffline: state => {
+    return state.deviceonoffline
+  },
+  gpschannelonoffline: state => {
+    return state.gpschannelonoffline
+  },
   alarmReport: state => {
     return state.alarmReport
   },

@@ -55,7 +55,7 @@ export default {
     if (!window.globalGpsSubscribed) {
       window.globalGpsSubscribed = true
       this.gpsSubHandler = this.sockets.subscribe('gps', (rawGpsData) => {
-        console.log('收到了后台推送websocket->gps信息！！！！！！！！！！\n', rawGpsData)
+        // console.log('收到了后台推送websocket->gps信息！！！！！！！！！！\n', rawGpsData)
         this.remoteId = rawGpsData.clientKey
         this.deviceOnline = true
         // 【修改1】切断原始响应式对象引用，不直接赋值rawGpsData
@@ -69,7 +69,7 @@ export default {
         }
 
         const [gcjLng, gcjLat] = this.wgs84ToGcj02(rawLng, rawLat)
-        console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
+        // console.log('✅ 转换后高德GCJ02坐标：', gcjLng, gcjLat)
 
         if (isNaN(gcjLng) || isNaN(gcjLat)) {
           console.warn('坐标转换后数值异常，跳过更新', gcjLng, gcjLat)
@@ -82,9 +82,23 @@ export default {
           gcjLat: Number(gcjLat)
         }
         this.$store.dispatch('updatePoint', updatepoints)
-        console.log('✅[power]发送的updatePoint state=：', updatepoints)
+        // console.log('✅[power]发送的updatePoint state=：', updatepoints)
       })
     }
+
+    this.sockets.subscribe('deviceonoffline', (data) => {
+      console.log('🔔 设备状态变更', data)
+      // data: { sn, cid, status: 'online' | 'offline', time }
+      // 在这里更新设备列表对应行的状态
+      this.$store.dispatch('deviceonoffline', data)
+    })
+
+    this.sockets.subscribe('gpschannelonoffline', (data) => {
+      console.log('🔔 GPS通道状态变更', data)
+      // data: { sn, cid, status: 'online' | 'offline', time }
+      // 在这里更新设备列表对应行的状态
+      this.$store.dispatch('gpschannelonoffline', data)
+    })
 
     this.$nextTick(async () => {
       this.getHeightsWidths()
