@@ -6,10 +6,11 @@
       <div class="top-title">LED智慧照明管理平台</div>
       <div class="top-right">
         <button class="btn" @click="refreshAll">刷新</button>
-        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '大屏' }}</button>
+        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '退出大屏' : '大屏' }}</button>
         <button class="btn" :style="{background: onlyMapMode ? '#00c48c' : '#00ffff'}" @click="switchOnlyMap">
-          {{ onlyMapMode ? '退出地图' : '全屏地图' }}
+          {{ onlyMapMode ? '退出全地图' : '全地图' }}
         </button>
+        <button class="btn" @click="openOperLog">日志</button>
       </div>
     </div>
 
@@ -18,7 +19,7 @@
       <!-- 左侧 -->
       <div class="left-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
-          <div class="panel-title"> 项目统计 </div>
+          <div class="panel-title"> 总览 </div>
           <div class="stat-grid">
             <div class="stat-card">
               <div class="num">0.23</div>
@@ -54,85 +55,91 @@
         </dv-border-box-1>
       </div>
 
-       <!-- 中间地图 -->
+            <!-- 中间地图 -->
       <div class="center-box">
         <dv-border-box-1 class="panel map-panel">
-          <div id="container" class="map-box" @click="closeSearchDropdown">
-            <div class="map-search-wrap">
-              <el-input
-                v-model="searchKey"
-                placeholder="搜索设备ID/名称 | 地址地点"
-                clearable
-                prefix-icon="el-icon-search"
-                @input="handleSearch"
-                @focus="onSearchFocus"
-                @blur="hideDropdownTimer"
-                @mousedown.prevent
-              ></el-input>
-              <div v-if="showDropdown && totalResult.length" class="search-dropdown-panel">
-                <div v-if="matchDeviceList.length" class="dropdown-group-title">设备点位</div>
-                <div
-                  v-for="dev in matchDeviceList"
-                  :key="dev.id"
-                  class="dropdown-item device-item"
-                  @click="selectDeviceItem(dev)"
-                >
-                  <div class="item-name">{{ dev.name || '未命名点位' }}</div>
-                  <div class="item-desc">
-                    ID：{{ dev.id }}｜
-                    <span :style="{color: dev.online ? '#39ff5e' : '#ff4444'}">
-                      {{ dev.online ? '在线' : '离线' }}
-                    </span>
+          <div class="map-wrapper">
+            <!-- 地图容器：只放地图，高德初始化会清空这里 -->
+            <div id="container" class="map-box" @click="closeSearchDropdown"></div>
+
+            <!-- UI 覆盖层：与地图完全重合，不会被高德清空 -->
+            <div class="map-ui-overlay">
+              <div class="map-search-wrap">
+                <el-input
+                  v-model="searchKey"
+                  placeholder="搜索设备ID/名称 | 地址地点"
+                  clearable
+                  prefix-icon="el-icon-search"
+                  @input="handleSearch"
+                  @focus="onSearchFocus"
+                  @blur="hideDropdownTimer"
+                  @mousedown.prevent
+                ></el-input>
+                <div v-if="showDropdown && totalResult.length" class="search-dropdown-panel">
+                  <div v-if="matchDeviceList.length" class="dropdown-group-title">设备点位</div>
+                  <div
+                    v-for="dev in matchDeviceList"
+                    :key="dev.id"
+                    class="dropdown-item device-item"
+                    @click="selectDeviceItem(dev)"
+                  >
+                    <div class="item-name">{{ dev.name || '未命名点位' }}</div>
+                    <div class="item-desc">
+                      ID：{{ dev.id }}｜
+                      <span :style="{color: dev.online ? '#39ff5e' : '#ff4444'}">
+                        {{ dev.online ? '在线' : '离线' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div v-if="matchPoiList.length" class="dropdown-group-title">地理位置</div>
+                  <div
+                    v-for="poi in matchPoiList"
+                    :key="poi.id"
+                    class="dropdown-item poi-item"
+                    @click="selectPoiItem(poi)"
+                  >
+                    <div class="item-name">{{ poi.name }}</div>
+                    <div class="item-desc">{{ poi.district }}{{ poi.address }}</div>
                   </div>
                 </div>
-                <div v-if="matchPoiList.length" class="dropdown-group-title">地理位置</div>
-                <div
-                  v-for="poi in matchPoiList"
-                  :key="poi.id"
-                  class="dropdown-item poi-item"
-                  @click="selectPoiItem(poi)"
-                >
-                  <div class="item-name">{{ poi.name }}</div>
-                  <div class="item-desc">{{ poi.district }}{{ poi.address }}</div>
-                </div>
               </div>
-            </div>
 
-            <div style="position:absolute;top:60px;right:14px;z-index:1002;">
-              <button class="map-top-btn" @click="goDefaultCenter" title="定位到地图中心点">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:5px;vertical-align:middle;flex-shrink:0;">
-                  <path d="M12 2C8 2 5 6 5 12c0 4 4 9 7 11 3-2 7-7 7-11 0-6-3-10-7-10zm0 14a3 3 0 110-6 3 3 0 010 6z"/>
-                </svg>
-                地图中心
-              </button>
-            </div>
+              <div style="position:absolute;top:60px;right:14px;z-index:1002;">
+                <button class="map-top-btn" @click="goDefaultCenter" title="定位到地图中心点">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:5px;vertical-align:middle;flex-shrink:0;">
+                    <path d="M12 2C8 2 5 6 5 12c0 4 4 9 7 11 3-2 7-7 7-11 0-6-3-10-7-10zm0 14a3 3 0 110-6 3 3 0 010 6z"/>
+                  </svg>
+                  地图中心
+                </button>
+              </div>
 
-            <div style="position:absolute;top:98px;right:14px;z-index:1002;">
-              <button v-if="checkBtn('mainpanel')" class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:5px;vertical-align:middle;flex-shrink:0;">
-                  <path d="M12 2a6 6 0 00-6 6c0 2.3 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a6 6 0 00-6-6zm0 12a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5zm-1 4h2v2h-2v-2zm0 3h2v1h-2v-1z"/>
-                </svg>
-                总控面板
-              </button>
-            </div>
+              <div style="position:absolute;top:98px;right:14px;z-index:1002;">
+                <button v-if="checkBtn('mainpanel')" class="map-top-btn" @click="showMainPanel = true" title="打开照明总控面板">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="margin-right:5px;vertical-align:middle;flex-shrink:0;">
+                    <path d="M12 2a6 6 0 00-6 6c0 2.3 1.19 4.47 3 5.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26c1.81-1.27 3-3.36 3-5.74a6 6 0 00-6-6zm0 12a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5zm-1 4h2v2h-2v-2zm0 3h2v1h-2v-1z"/>
+                  </svg>
+                  总控面板
+                </button>
+              </div>
 
-            <div class="map-tool-bar" v-if="hasPointEditPerm">
-              <button class="tool-btn" :class="{active: drawPointMode}" @click="toggleDrawMode">
-                {{ drawPointMode ? '关闭打点' : '开启点位配置' }}
-              </button>
-              <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
-              <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
-              <button class="tool-btn" @click="locatePoint">定位点位</button>
-            </div>
+              <div class="map-tool-bar" v-if="hasPointEditPerm">
+                <button class="tool-btn" :class="{active: drawPointMode}" @click="toggleDrawMode">
+                  {{ drawPointMode ? '关闭打点' : '开启点位配置' }}
+                </button>
+                <button class="tool-btn clear-btn" @click="clearAllManualPoint">清空点位</button>
+                <button class="tool-btn save-btn" @click="saveAllPoints">批量保存点位</button>
+                <button class="tool-btn" @click="locatePoint">定位点位</button>
+              </div>
 
-            <div class="map-point-list" v-if="manualPointList.length > 0">
-              <div class="list-title">已添加点位({{manualPointList.length}})</div>
-              <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
-                <span @click="locatePointByIndex(idx)" style="cursor:pointer;" title="鼠标点击，定位该点位">
-                  {{idx+1}} | {{item.name}} | {{item.type || '未分类'}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}
-                </span>
-                <button class="tool-btn" style="background-color:#0099ff; color:#fff; border:none; border-radius:3px;" @click="locatePointByIndex(idx)">定位</button>
-                <button class="tool-btn" style="background-color:#ff4444; color:#fff; border:none; border-radius:3px;" @click="removePoint(idx)">删除</button>
+              <div class="map-point-list" v-if="manualPointList.length > 0">
+                <div class="list-title">已添加点位({{manualPointList.length}})</div>
+                <div v-for="(item, idx) in manualPointList" :key="idx" class="point-item">
+                  <span @click="locatePointByIndex(idx)" style="cursor:pointer;" title="鼠标点击，定位该点位">
+                    {{idx+1}} | {{item.name}} | {{item.type || '未分类'}} | {{item.id}} GCJ:{{item.lng}},{{item.lat}}
+                  </span>
+                  <button class="tool-btn" style="background-color:#0099ff; color:#fff; border:none; border-radius:3px;" @click="locatePointByIndex(idx)">定位</button>
+                  <button class="tool-btn" style="background-color:#ff4444; color:#fff; border:none; border-radius:3px;" @click="removePoint(idx)">删除</button>
+                </div>
               </div>
             </div>
           </div>
@@ -141,7 +148,7 @@
 
       <div class="right-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
-          <div class="panel-title">设备列表</div>
+          <div class="panel-title">设备</div>
           <el-input type="text" class="search-input" placeholder="搜索名称/ID" v-model="deviceSearch" clearable prefix-icon="el-icon-search" />
           <table class="device-table">
             <thead>
@@ -162,7 +169,7 @@
 
       <DeviceControlPanel :visible.sync="showDevicePanel" :remoteId="remoteId" />
       <MainControlPanel :visible="showMainPanel" @close="showMainPanel = false" />
-
+      <OperLogPanel :visible.sync="operLogVisible" />
       <div class="point-mask" v-if="showPointDialog">
         <div class="point-dialog">
           <div class="dialog-header">新增点位</div>
@@ -201,13 +208,14 @@ import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
 import DeviceControlPanel from './devicepanel.vue'
 import MainControlPanel from './mainControlPanel.vue'
+import OperLogPanel from './operLogPanel.vue'
 import { getHeight } from '@/utils/height.js'
 import { mapGetters } from 'vuex'
 import { GET_USER_INFO } from '@/store/getters/type'
 
 export default {
   name: 'Screen',
-  components: { borderBox1, DeviceControlPanel, MainControlPanel },
+  components: { borderBox1, DeviceControlPanel, MainControlPanel, OperLogPanel },
 
   data () {
     return {
@@ -222,11 +230,12 @@ export default {
       lastGps: null,
       showDevicePanel: false,
       showMainPanel: false,
+      operLogVisible: false,
       isFullScreen: false,
       manualPointList: [],
       manualMarkers: [],
       drawPointMode: false,
-      userPermissions: [],
+      // userPermissions: [],
       showPointDialog: false,
       tempPoint: { belong: '', type: '', name: '', id: '', lng: '', lat: '', wgsLng: '', wgsLat: '' },
       dbGreenMarkers: [],
@@ -263,8 +272,25 @@ export default {
   },
 
   computed: {
-    ...mapGetters({ get_user_info: GET_USER_INFO, TreeData: 'TreeData', updatePoint: 'updatePoint', btnList: 'getBtnList' }),
+    ...mapGetters({
+      get_user_info: GET_USER_INFO,
+      TreeData: 'TreeData',
+      updatePoint: 'updatePoint',
+      btnList: 'getBtnList',
+      deviceonoffline: 'deviceonoffline',
+      gpschannelonoffline: 'gpschannelonoffline'
+    }),
     hasPointEditPerm () { return this.userPermissions.includes('point:edit') },
+    userPermissions () {
+      const usertype = this.get_user_info && this.get_user_info.user && this.get_user_info.user.usertype
+      const perms = []
+      if (usertype <= 0) {
+        perms.push('point:edit')
+      } else {
+        perms.push('device:read')
+      }
+      return perms
+    },
     tableList () {
       const keyword = this.deviceSearch.trim().toLowerCase()
       return this.dbGreenMarkers.filter(row => {
@@ -294,7 +320,31 @@ export default {
         console.log('[screen] store->updatePoint :=', data)
         if (!data || !data.cid) return
         this.updateMapPointByID(data)
-      }
+      },
+      deep: true
+    },
+    'deviceonoffline': {
+      handler (data) {
+        console.log('[screen] store->deviceonoffline :=', data)
+        if (!data || !data.cid) return
+        // this.updateDeviceStatus(data)
+        // 只找当前这一个marker，单点更新，不循环全部
+        // console.log('[screen] store->deviceonoffline this.dbGreenMarkers:=', this.dbGreenMarkers)
+        const targetMarker = this.dbGreenMarkers.find(m => m.id === data.cid)
+        if (targetMarker) {
+          targetMarker.online = (data.status === 'online')
+          console.log('[screen] deviceonoffline 在线状态改变，点位cid=', data.cid, data.status)
+        }
+      },
+      deep: true
+    },
+    'gpschannelonoffline': {
+      handler (data) {
+        console.log('[screen] store->gpschannelonoffline :=', data)
+        // if (!data || !data.cid) return
+        // this.updateGpsChannelStatus(data)
+      },
+      deep: true
     }
   },
 
@@ -305,18 +355,19 @@ export default {
       getHeight()
       this.getHeightsWidths()
     })
-    this.loginusertype = this.get_user_info.user.usertype
-    console.log('当前登录的用户类型', this.get_user_info.user.username, this.loginusertype)
-    if (this.loginusertype <= 0) {
-      this.userPermissions.push('point:edit')
-    } else {
-      this.userPermissions.push('device:read')
-    }
+    // this.loginusertype = this.get_user_info.user.usertype
+    // console.log('当前登录的用户类型', this.get_user_info.user.username, this.loginusertype)
+    // if (this.loginusertype <= 0) {
+    //   this.userPermissions.push('point:edit')
+    // } else {
+    //   this.userPermissions.push('device:read')
+    // }
   },
 
   mounted () {
     this.isDestroyed = false
     this.updateTime()
+    this.initLineChart()
     this.timer = setInterval(() => this.updateTime(), 1000)
     this.initMap()
     window.__screenResizeHandler = () => this.$nextTick(() => this.getHeightsWidths())
@@ -338,7 +389,13 @@ export default {
     this.isDestroyed = true
     this.clearAllTimer()
     this.destroyMapInstance()
-    if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
+    // 安全销毁图表实例
+    this.safeDisposeChart()
+    // 移除图表专用的 resize 监听，防止内存泄漏
+    if (this._chartResizeHandler) {
+      window.removeEventListener('resize', this._chartResizeHandler)
+      this._chartResizeHandler = null
+    }
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
     document.removeEventListener('fullscreenchange', this.__fullscreenHandler)
@@ -352,7 +409,9 @@ export default {
     this.clearAllTimer()
     this.showDropdown = false
     this.destroyMapInstance()
-    if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
+    // if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
+    // 缓存失活时安全销毁图表，释放内存
+    this.safeDisposeChart()
   },
 
   activated () {
@@ -366,6 +425,8 @@ export default {
         }, 150)
       }
     })
+    // 关键：切回时重新初始化图表，防止 keep-alive 缓存导致图表空白
+    this.initLineChart()
   },
 
   beforeRouteEnter (to, from, next) { next(async vm => {}) },
@@ -373,6 +434,9 @@ export default {
   sockets: {},
 
   methods: {
+    openOperLog () {
+      this.operLogVisible = true
+    },
     destroyAllMapOverlay () {
       this.infoWinOpenTimers.forEach(id => clearTimeout(id))
       this.infoWinOpenTimers = []
@@ -448,8 +512,14 @@ export default {
       this.map.destroy()
       // 清理高德可能挂在 window 上的内部引用
       if (window.AMap && window.AMap._map === this.map) delete window.AMap._map
+      // const container = document.getElementById('container')
+      // if (container) container.innerHTML = ''
+      // 只移除高德地图残留的 DOM，保留 Vue 自定义 UI（搜索框、按钮等）
       const container = document.getElementById('container')
-      if (container) container.innerHTML = ''
+      if (container) {
+        const amapContainer = container.querySelector('.amap-container')
+        if (amapContainer) amapContainer.remove()
+      }
       this.map = null
       this.placeSearch = null
     },
@@ -464,9 +534,58 @@ export default {
       if (this.activateTimer) { clearTimeout(this.activateTimer); this.activateTimer = null }
       if (this.switchMapTimer) { clearTimeout(this.switchMapTimer); this.switchMapTimer = null }
     },
+    safeDisposeChart () {
+      if (this.chartInstance) {
+        if (!this.chartInstance.isDisposed()) {
+          this.chartInstance.dispose()
+        }
+        this.chartInstance = null
+      }
+    },
+    // refreshAll () { window.location.reload() },
+    async refreshAll () {
+      this.$message.info('正在刷新数据...')
 
-    refreshAll () { window.location.reload() },
+      try {
+        // 1. 清理所有地图覆盖物（保留地图实例和事件绑定）
+        this.destroyAllMapOverlay()
 
+        // 2. 重新加载数据库点位
+        const deviceIcon = this.createDeviceIcon()
+        await this.loadDbGreenPoints(deviceIcon)
+        await this.loadDeviceStatus()
+        // 3. 重建中心标记
+        this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
+
+        // 4. 重新初始化图表
+        this.initLineChart()
+
+        this.$message.success('刷新成功')
+      } catch (err) {
+        console.error('刷新失败', err)
+        this.$message.error('刷新失败，请检查网络或地图服务')
+      }
+    },
+    async loadDeviceStatus () {
+      const res = await this.instance({ url: '/api/tcp/devicelist', method: 'get' })
+      console.log('【screen】读取的数据库设备列表/api/tcp/devicelist:', res.data)
+      // 修改在线状态
+      const list = res.data.list || []
+      // 初始化：把接口返回的status同步到dbGreenMarkers的online
+      this.dbGreenMarkers.forEach(marker => {
+        const findDev = list.find(item => item.cid === marker.id)
+        if (findDev) {
+          marker.online = findDev.status === 'online'
+        }
+      })
+    },
+    createDeviceIcon () {
+      return new window.AMap.Icon({
+        size: new window.AMap.Size(48, 64),
+        image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+        imageSize: new window.AMap.Size(48, 64)
+      })
+    },
     checkBtn (btnKey) { return this.btnList.includes('*') || this.btnList.includes(btnKey) },
 
     switchOnlyMap () {
@@ -579,9 +698,15 @@ export default {
           this.destroyMapInstance()
           await new Promise(resolve => setTimeout(resolve, 50))
         }
+        // const container = document.getElementById('container')
+        // if (!container) { console.error('地图容器 #container 不存在'); return }
+        // container.innerHTML = ''
         const container = document.getElementById('container')
         if (!container) { console.error('地图容器 #container 不存在'); return }
-        // container.innerHTML = ''
+
+        // 防护：确保没有残留的高德地图 DOM，避免重复初始化报错
+        const residual = container.querySelector('.amap-container')
+        if (residual) residual.remove()
 
         const initLng = 116.331644
         const initLat = 40.043262
@@ -593,14 +718,15 @@ export default {
           this.map.addControl(this.toolBar)
           this.placeSearch = new window.AMap.PlaceSearch({ city: '北京', pageSize: 8 })
         })
-
-        const deviceIcon = new window.AMap.Icon({
-          size: new window.AMap.Size(48, 64),
-          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
-          imageSize: new window.AMap.Size(48, 64)
-        })
+        const deviceIcon = this.createDeviceIcon()
+        // const deviceIcon = new window.AMap.Icon({
+        //   size: new window.AMap.Size(48, 64),
+        //   image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+        //   imageSize: new window.AMap.Size(48, 64)
+        // })
 
         await this.loadDbGreenPoints(deviceIcon)
+        await this.loadDeviceStatus()
         if (this.isDestroyed) return
 
         this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
@@ -1005,7 +1131,7 @@ export default {
       currPoint.marker.setIcon(currPoint.greenIcon)
       currPoint.marker.setPosition([data.gcjLng, data.gcjLat])
       if (currPoint.label) currPoint.label.setPosition([data.gcjLng, data.gcjLat])
-      currPoint.online = true
+      // currPoint.online = true 20261020 cancel
       currPoint.gcjLng = data.gcjLng
       currPoint.gcjLat = data.gcjLat
       console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅')
@@ -1087,10 +1213,15 @@ export default {
         $('.content').width(contentWidths)
         $('.screen-page').width(contentWidths)
       }
+      // this.$nextTick(() => {
+      //   if (this.$refs.chartLine) {
+      //     const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+      //     if (chart) chart.resize()
+      //   }
+      // })
       this.$nextTick(() => {
-        if (this.$refs.chartLine) {
-          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-          if (chart) chart.resize()
+        if (this.chartInstance && !this.chartInstance.isDisposed()) {
+          this.chartInstance.resize()
         }
       })
     },
@@ -1108,18 +1239,71 @@ export default {
       this.nowTime = `${w} ${y}-${m}-${d} ${hh}:${mm}:${ss}`
     },
 
+    // initLineChart () {
+    //   if (!this.$refs.chartLine) return
+    //   if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
+    //   this.chartInstance = echarts.init(this.$refs.chartLine)
+    //   this.chartInstance.setOption({
+    //     backgroundColor: 'transparent',
+    //     tooltip: { trigger: 'axis' },
+    //     grid: { left: 25, right: 25, top: 15, bottom: 45, containLabel: true },
+    //     xAxis: { type: 'category', data: Array.from({ length: 20 }, (i) => (i + 1).toString()) },
+    //     yAxis: { type: 'value', min: 0, max: 3 },
+    //     series: [{ name: '电耗', type: 'line', smooth: true, data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2] }]
+    //   })
+    // }
     initLineChart () {
+      // 安全销毁旧实例，防止重复 init 导致内存泄漏
+      this.safeDisposeChart()
       if (!this.$refs.chartLine) return
-      if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
+
       this.chartInstance = echarts.init(this.$refs.chartLine)
-      this.chartInstance.setOption({
+
+      const option = {
         backgroundColor: 'transparent',
         tooltip: { trigger: 'axis' },
         grid: { left: 25, right: 25, top: 15, bottom: 45, containLabel: true },
-        xAxis: { type: 'category', data: Array.from({ length: 20 }, (i) => (i + 1).toString()) },
-        yAxis: { type: 'value', min: 0, max: 3 },
-        series: [{ name: '电耗', type: 'line', smooth: true, data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2] }]
-      })
+        xAxis: {
+          type: 'category',
+          data: Array.from({ length: 20 }, (_, i) => (i + 1).toString()),
+          axisLine: { lineStyle: { color: '#00ffff' } },
+          axisLabel: { color: '#fff' }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          max: 3,
+          axisLine: { lineStyle: { color: '#00ffff' } },
+          axisLabel: { color: '#fff' },
+          splitLine: { lineStyle: { color: 'rgba(0,255,255,0.1)' } }
+        },
+        series: [{
+          name: '电耗',
+          type: 'line',
+          smooth: true,
+          data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2],
+          lineStyle: { color: '#00ffff', width: 2 },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(0,255,255,0.4)' },
+              { offset: 1, color: 'rgba(0,255,255,0.05)' }
+            ])
+          },
+          itemStyle: { color: '#00ffff' }
+        }]
+      }
+
+      this.chartInstance.setOption(option)
+
+      // 绑定 resize 事件（只绑定一次，避免重复监听导致内存泄漏）
+      if (!this._chartResizeHandler) {
+        this._chartResizeHandler = () => {
+          if (this.chartInstance && !this.chartInstance.isDisposed()) {
+            this.chartInstance.resize()
+          }
+        }
+        window.addEventListener('resize', this._chartResizeHandler)
+      }
     }
   }
 }
@@ -1684,5 +1868,26 @@ export default {
 
 .poi-item .item-name {
   color: #00ffff;
+}
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* UI 覆盖层：与 .map-box 完全重合，不会被高德清空 */
+.map-ui-overlay {
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  right: 10px;
+  bottom: 5px;
+  pointer-events: none;   /* 点击穿透到下方地图 */
+  z-index: 1000;
+}
+
+/* 恢复 overlay 内所有元素的点击交互 */
+.map-ui-overlay > * {
+  pointer-events: auto;
 }
 </style>

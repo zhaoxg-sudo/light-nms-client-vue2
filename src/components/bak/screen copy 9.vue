@@ -6,9 +6,9 @@
       <div class="top-title">LED智慧照明管理平台</div>
       <div class="top-right">
         <button class="btn" @click="refreshAll">刷新</button>
-        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '退出大屏' : '大屏' }}</button>
+        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '恢复缩放' : '大屏' }}</button>
         <button class="btn" :style="{background: onlyMapMode ? '#00c48c' : '#00ffff'}" @click="switchOnlyMap">
-          {{ onlyMapMode ? '退出全地图' : '全地图' }}
+          {{ onlyMapMode ? '退出地图' : '全屏地图' }}
         </button>
       </div>
     </div>
@@ -199,8 +199,8 @@
 import $ from 'jquery'
 import { borderBox1 } from '@jiaminghi/data-view'
 import * as echarts from 'echarts'
-import DeviceControlPanel from './devicepanel.vue'
-import MainControlPanel from './mainControlPanel.vue'
+import DeviceControlPanel from '../screen/devicepanel.vue'
+import MainControlPanel from '../screen/mainControlPanel.vue'
 import { getHeight } from '@/utils/height.js'
 import { mapGetters } from 'vuex'
 import { GET_USER_INFO } from '@/store/getters/type'
@@ -226,7 +226,7 @@ export default {
       manualPointList: [],
       manualMarkers: [],
       drawPointMode: false,
-      // userPermissions: [],
+      userPermissions: [],
       showPointDialog: false,
       tempPoint: { belong: '', type: '', name: '', id: '', lng: '', lat: '', wgsLng: '', wgsLat: '' },
       dbGreenMarkers: [],
@@ -265,16 +265,6 @@ export default {
   computed: {
     ...mapGetters({ get_user_info: GET_USER_INFO, TreeData: 'TreeData', updatePoint: 'updatePoint', btnList: 'getBtnList' }),
     hasPointEditPerm () { return this.userPermissions.includes('point:edit') },
-    userPermissions () {
-      const usertype = this.get_user_info && this.get_user_info.user && this.get_user_info.user.usertype
-      const perms = []
-      if (usertype <= 0) {
-        perms.push('point:edit')
-      } else {
-        perms.push('device:read')
-      }
-      return perms
-    },
     tableList () {
       const keyword = this.deviceSearch.trim().toLowerCase()
       return this.dbGreenMarkers.filter(row => {
@@ -315,19 +305,18 @@ export default {
       getHeight()
       this.getHeightsWidths()
     })
-    // this.loginusertype = this.get_user_info.user.usertype
-    // console.log('当前登录的用户类型', this.get_user_info.user.username, this.loginusertype)
-    // if (this.loginusertype <= 0) {
-    //   this.userPermissions.push('point:edit')
-    // } else {
-    //   this.userPermissions.push('device:read')
-    // }
+    this.loginusertype = this.get_user_info.user.usertype
+    console.log('当前登录的用户类型', this.get_user_info.user.username, this.loginusertype)
+    if (this.loginusertype <= 0) {
+      this.userPermissions.push('point:edit')
+    } else {
+      this.userPermissions.push('device:read')
+    }
   },
 
   mounted () {
     this.isDestroyed = false
     this.updateTime()
-    this.initLineChart()
     this.timer = setInterval(() => this.updateTime(), 1000)
     this.initMap()
     window.__screenResizeHandler = () => this.$nextTick(() => this.getHeightsWidths())
@@ -349,13 +338,7 @@ export default {
     this.isDestroyed = true
     this.clearAllTimer()
     this.destroyMapInstance()
-    // 安全销毁图表实例
-    this.safeDisposeChart()
-    // 移除图表专用的 resize 监听，防止内存泄漏
-    if (this._chartResizeHandler) {
-      window.removeEventListener('resize', this._chartResizeHandler)
-      this._chartResizeHandler = null
-    }
+    if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
     window.removeEventListener('resize', window.__screenResizeHandler)
     delete window.__screenResizeHandler
     document.removeEventListener('fullscreenchange', this.__fullscreenHandler)
@@ -369,9 +352,7 @@ export default {
     this.clearAllTimer()
     this.showDropdown = false
     this.destroyMapInstance()
-    // if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
-    // 缓存失活时安全销毁图表，释放内存
-    this.safeDisposeChart()
+    if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
   },
 
   activated () {
@@ -385,8 +366,6 @@ export default {
         }, 150)
       }
     })
-    // 关键：切回时重新初始化图表，防止 keep-alive 缓存导致图表空白
-    this.initLineChart()
   },
 
   beforeRouteEnter (to, from, next) { next(async vm => {}) },
@@ -469,14 +448,8 @@ export default {
       this.map.destroy()
       // 清理高德可能挂在 window 上的内部引用
       if (window.AMap && window.AMap._map === this.map) delete window.AMap._map
-      // const container = document.getElementById('container')
-      // if (container) container.innerHTML = ''
-      // 只移除高德地图残留的 DOM，保留 Vue 自定义 UI（搜索框、按钮等）
       const container = document.getElementById('container')
-      if (container) {
-        const amapContainer = container.querySelector('.amap-container')
-        if (amapContainer) amapContainer.remove()
-      }
+      if (container) container.innerHTML = ''
       this.map = null
       this.placeSearch = null
     },
@@ -491,45 +464,9 @@ export default {
       if (this.activateTimer) { clearTimeout(this.activateTimer); this.activateTimer = null }
       if (this.switchMapTimer) { clearTimeout(this.switchMapTimer); this.switchMapTimer = null }
     },
-    safeDisposeChart () {
-      if (this.chartInstance) {
-        if (!this.chartInstance.isDisposed()) {
-          this.chartInstance.dispose()
-        }
-        this.chartInstance = null
-      }
-    },
-    // refreshAll () { window.location.reload() },
-    async refreshAll () {
-      this.$message.info('正在刷新数据...')
 
-      try {
-        // 1. 清理所有地图覆盖物（保留地图实例和事件绑定）
-        this.destroyAllMapOverlay()
+    refreshAll () { window.location.reload() },
 
-        // 2. 重新加载数据库点位
-        const deviceIcon = this.createDeviceIcon()
-        await this.loadDbGreenPoints(deviceIcon)
-
-        // 3. 重建中心标记
-        this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
-
-        // 4. 重新初始化图表
-        this.initLineChart()
-
-        this.$message.success('刷新成功')
-      } catch (err) {
-        console.error('刷新失败', err)
-        this.$message.error('刷新失败，请检查网络或地图服务')
-      }
-    },
-    createDeviceIcon () {
-      return new window.AMap.Icon({
-        size: new window.AMap.Size(48, 64),
-        image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
-        imageSize: new window.AMap.Size(48, 64)
-      })
-    },
     checkBtn (btnKey) { return this.btnList.includes('*') || this.btnList.includes(btnKey) },
 
     switchOnlyMap () {
@@ -642,15 +579,9 @@ export default {
           this.destroyMapInstance()
           await new Promise(resolve => setTimeout(resolve, 50))
         }
-        // const container = document.getElementById('container')
-        // if (!container) { console.error('地图容器 #container 不存在'); return }
-        // container.innerHTML = ''
         const container = document.getElementById('container')
         if (!container) { console.error('地图容器 #container 不存在'); return }
-
-        // 防护：确保没有残留的高德地图 DOM，避免重复初始化报错
-        const residual = container.querySelector('.amap-container')
-        if (residual) residual.remove()
+        // container.innerHTML = ''
 
         const initLng = 116.331644
         const initLat = 40.043262
@@ -662,12 +593,12 @@ export default {
           this.map.addControl(this.toolBar)
           this.placeSearch = new window.AMap.PlaceSearch({ city: '北京', pageSize: 8 })
         })
-        const deviceIcon = this.createDeviceIcon()
-        // const deviceIcon = new window.AMap.Icon({
-        //   size: new window.AMap.Size(48, 64),
-        //   image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
-        //   imageSize: new window.AMap.Size(48, 64)
-        // })
+
+        const deviceIcon = new window.AMap.Icon({
+          size: new window.AMap.Size(48, 64),
+          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0OCA2NCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNDQiIGhlaWdodD0iNjAiIHJ4PSI0IiBzdHJva2U9IiMwMGZmNjYiIHN0cm9rZS13aWR0aD0iMyIgZmlsbD0iIzBiMTIyOSIvPgogIDxyZWN0IHg9IjgiIHk9IjEwIiB3aWR0aD0iMzIiIGhlaWdodD0iMTIiIGZpbGw9IiMwMGZmNjYiLz4KICA8cGF0aCBkPSJNMjYgMzAgTDIyIDM4IEwyOCAzOCBMMjQgNDgiIHN0cm9rZT0iIzAwZmY2NiIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cmVjdCB4PSItNiIgeT0iMTQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KICA8cmVjdCB4PSItNiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iMiIgc3Ryb2tlPSIjMDBmZjY2IiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz4KPC9zdmc+',
+          imageSize: new window.AMap.Size(48, 64)
+        })
 
         await this.loadDbGreenPoints(deviceIcon)
         if (this.isDestroyed) return
@@ -1156,15 +1087,10 @@ export default {
         $('.content').width(contentWidths)
         $('.screen-page').width(contentWidths)
       }
-      // this.$nextTick(() => {
-      //   if (this.$refs.chartLine) {
-      //     const chart = echarts.getInstanceByDom(this.$refs.chartLine)
-      //     if (chart) chart.resize()
-      //   }
-      // })
       this.$nextTick(() => {
-        if (this.chartInstance && !this.chartInstance.isDisposed()) {
-          this.chartInstance.resize()
+        if (this.$refs.chartLine) {
+          const chart = echarts.getInstanceByDom(this.$refs.chartLine)
+          if (chart) chart.resize()
         }
       })
     },
@@ -1182,71 +1108,18 @@ export default {
       this.nowTime = `${w} ${y}-${m}-${d} ${hh}:${mm}:${ss}`
     },
 
-    // initLineChart () {
-    //   if (!this.$refs.chartLine) return
-    //   if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
-    //   this.chartInstance = echarts.init(this.$refs.chartLine)
-    //   this.chartInstance.setOption({
-    //     backgroundColor: 'transparent',
-    //     tooltip: { trigger: 'axis' },
-    //     grid: { left: 25, right: 25, top: 15, bottom: 45, containLabel: true },
-    //     xAxis: { type: 'category', data: Array.from({ length: 20 }, (i) => (i + 1).toString()) },
-    //     yAxis: { type: 'value', min: 0, max: 3 },
-    //     series: [{ name: '电耗', type: 'line', smooth: true, data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2] }]
-    //   })
-    // }
     initLineChart () {
-      // 安全销毁旧实例，防止重复 init 导致内存泄漏
-      this.safeDisposeChart()
       if (!this.$refs.chartLine) return
-
+      if (this.chartInstance) { this.chartInstance.dispose(); this.chartInstance = null }
       this.chartInstance = echarts.init(this.$refs.chartLine)
-
-      const option = {
+      this.chartInstance.setOption({
         backgroundColor: 'transparent',
         tooltip: { trigger: 'axis' },
         grid: { left: 25, right: 25, top: 15, bottom: 45, containLabel: true },
-        xAxis: {
-          type: 'category',
-          data: Array.from({ length: 20 }, (_, i) => (i + 1).toString()),
-          axisLine: { lineStyle: { color: '#00ffff' } },
-          axisLabel: { color: '#fff' }
-        },
-        yAxis: {
-          type: 'value',
-          min: 0,
-          max: 3,
-          axisLine: { lineStyle: { color: '#00ffff' } },
-          axisLabel: { color: '#fff' },
-          splitLine: { lineStyle: { color: 'rgba(0,255,255,0.1)' } }
-        },
-        series: [{
-          name: '电耗',
-          type: 'line',
-          smooth: true,
-          data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2],
-          lineStyle: { color: '#00ffff', width: 2 },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(0,255,255,0.4)' },
-              { offset: 1, color: 'rgba(0,255,255,0.05)' }
-            ])
-          },
-          itemStyle: { color: '#00ffff' }
-        }]
-      }
-
-      this.chartInstance.setOption(option)
-
-      // 绑定 resize 事件（只绑定一次，避免重复监听导致内存泄漏）
-      if (!this._chartResizeHandler) {
-        this._chartResizeHandler = () => {
-          if (this.chartInstance && !this.chartInstance.isDisposed()) {
-            this.chartInstance.resize()
-          }
-        }
-        window.addEventListener('resize', this._chartResizeHandler)
-      }
+        xAxis: { type: 'category', data: Array.from({ length: 20 }, (i) => (i + 1).toString()) },
+        yAxis: { type: 'value', min: 0, max: 3 },
+        series: [{ name: '电耗', type: 'line', smooth: true, data: [2.5, 2.5, 2.5, 2.5, 2.4, 2.2, 2.0, 1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2] }]
+      })
     }
   }
 }

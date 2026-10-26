@@ -83,6 +83,14 @@
               </div>
             </div>
           </div>
+           <div class="col-md-6" v-if="upData.stationtype!=0">
+            <div class="form-group">
+              <label class="col-sm-6 control-label">DTU序列号</label>
+              <div class="col-sm-6">
+                <input type="text" class="form-control" v-model="upData.dtusn" style="width:130px;">
+              </div>
+            </div>
+          </div>
         </div>
         <div class="row">
           <div class="col-md-6">
@@ -130,7 +138,8 @@ export default {
         ipport: '',
         childrennum: '',
         gpslng: '',
-        gpslat: ''
+        gpslat: '',
+        dtusn: ''
       },
       returnData: {node: null, data: null, addNodeData: null},
       rules: {

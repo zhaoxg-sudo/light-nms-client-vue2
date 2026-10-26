@@ -86,8 +86,8 @@
                     <div class="item-name">{{ dev.name || '未命名点位' }}</div>
                     <div class="item-desc">
                       ID：{{ dev.id }}｜
-                      <span :style="{color: dev.online ? '#39ff5e' : '#ff4444'}">
-                        {{ dev.online ? '在线' : '离线' }}
+                      <span :style="{color: dev.devChannelOnline === 'online' ? '#39ff5e' : '#ff4444'}">
+                        {{ dev.devChannelOnline === 'online' ? '在线' : '离线' }}
                       </span>
                     </div>
                   </div>
@@ -146,7 +146,7 @@
         </dv-border-box-1>
       </div>
 
-      <div class="right-box" v-show="!onlyMapMode">
+      <!-- <div class="right-box" v-show="!onlyMapMode">
         <dv-border-box-1 class="panel">
           <div class="panel-title">设备</div>
           <el-input type="text" class="search-input" placeholder="搜索名称/ID" v-model="deviceSearch" clearable prefix-icon="el-icon-search" />
@@ -164,6 +164,95 @@
               <tr v-if="tableList.length === 0"><td colspan="4">暂无点位数据</td></tr>
             </tbody>
           </table>
+        </dv-border-box-1>
+      </div> -->
+      <div class="right-box" v-show="!onlyMapMode">
+        <dv-border-box-1 class="panel">
+          <!-- 标题：单独一行，居中 -->
+          <div class="panel-title">设备</div>
+          <!-- Tab 下移，标题下面 -->
+          <div class="tab-bar">
+            <div
+              class="tab-item"
+              :class="{active: activeDeviceTab === '直流柜'}"
+              @click="activeDeviceTab = '直流柜'"
+            >直流柜</div>
+            <div
+              class="tab-item"
+              :class="{active: activeDeviceTab === '4G-DTU'}"
+              @click="activeDeviceTab = '4G-DTU'"
+            >4G-DTU</div>
+          </div>
+          <!-- Tab1：设备1 -->
+          <div v-show="activeDeviceTab === '直流柜'">
+            <el-input
+              type="text"
+              class="search-input"
+              placeholder="搜索名称/ID"
+              v-model="deviceSearch"
+              clearable
+              prefix-icon="el-icon-search"
+            />
+            <table class="device-table">
+              <thead>
+                <tr>
+                  <th>序号</th>
+                  <th>点位名称</th>
+                  <th>点位ID</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, idx) in tableList" :key="item.id" @click="handleClickRow(item.id)" @dblclick="openDevicePanel(item.id)">
+                  <td>{{ idx + 1 }}</td>
+                  <td>{{ item.name || "未命名" }}</td>
+                  <td>{{ item.id }}</td>
+                  <!-- <span style="color:#fff;">DEBUG:{{item.devChannelOnline}}</span> -->
+                  <td :class="item.devChannelOnline === 'online' ? 'online' : item.devChannelOnline === 'unknown' ? 'unknown' : 'offline'">
+                    {{ item.devChannelOnline === 'online' ? '在线' : item.devChannelOnline === 'unknown' ? '身份异常' : '离线' }}
+                  </td>
+
+                </tr>
+                <tr v-if="tableList.length === 0">
+                  <td colspan="4">暂无点位数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Tab2：设备2 -->
+          <div v-show="activeDeviceTab === '4G-DTU'">
+            <el-input
+              type="text"
+              class="search-input"
+              placeholder="搜索名称/ID"
+              v-model="deviceSearch"
+              clearable
+              prefix-icon="el-icon-search"
+            />
+            <table class="device-table">
+              <thead>
+                <tr>
+                  <th>序号</th>
+                  <th>点位名称</th>
+                  <th>4G序列号</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, idx) in fourGList" :key="item.id" @click="handleClickRow(item.id)" @dblclick="openDevicePanel(item.id)">
+                  <td>{{ idx + 1 }}</td>
+                  <td>{{ item.name || "未命名" }}</td>
+                  <td>{{ item.sn }}</td>
+                   <td :class="item.gpsChannelOnline === 'online' ? 'online' : item.gpsChannelOnline === 'unknown' ? 'unknown' : 'offline'">
+                    {{ item.gpsChannelOnline === 'online' ? '在线' : item.gpsChannelOnline === 'unknown' ? '身份异常' : '离线' }}
+                  </td>
+                </tr>
+                <tr v-if="fourGList.length === 0">
+                  <td colspan="4">暂无点位数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </dv-border-box-1>
       </div>
 
@@ -267,7 +356,12 @@ export default {
       activateTimer: null,
       switchMapTimer: null,
       isDestroyed: false,
-      chartInstance: null
+      chartInstance: null,
+      // Tab切换控制
+      activeDeviceTab: '直流柜',
+      // 两个Tab的搜索框
+      deviceSearch1: '',
+      deviceSearch2: ''
     }
   },
 
@@ -298,6 +392,15 @@ export default {
         const id = String(row.id || '').toLowerCase()
         if (!keyword) return true
         return name.includes(keyword) || id.includes(keyword)
+      })
+    },
+    fourGList () {
+      const keyword = this.deviceSearch.trim().toLowerCase()
+      return this.dbGreenMarkers.filter(row => {
+        const name = String(row.name || '').toLowerCase()
+        const sn = String(row.sn || '').toLowerCase()
+        if (!keyword) return true
+        return name.includes(keyword) || sn.includes(keyword)
       })
     }
   },
@@ -333,6 +436,7 @@ export default {
         const targetMarker = this.dbGreenMarkers.find(m => m.id === data.cid)
         if (targetMarker) {
           targetMarker.online = (data.status === 'online')
+          targetMarker.devChannelOnline = data.status
           console.log('[screen] deviceonoffline 在线状态改变，点位cid=', data.cid, data.status)
         }
       },
@@ -341,8 +445,12 @@ export default {
     'gpschannelonoffline': {
       handler (data) {
         console.log('[screen] store->gpschannelonoffline :=', data)
-        // if (!data || !data.cid) return
-        // this.updateGpsChannelStatus(data)
+        if (!data || !data.sn) return
+        const targetMarker = this.dbGreenMarkers.find(m => m.sn === data.sn)
+        if (targetMarker) {
+          targetMarker.gpsChannelOnline = data.status
+          console.log('[screen] gpschannelonoffline 在线状态改变，点位cid=', data.sn, data.status)
+        }
       },
       deep: true
     }
@@ -554,6 +662,7 @@ export default {
         const deviceIcon = this.createDeviceIcon()
         await this.loadDbGreenPoints(deviceIcon)
         await this.loadDeviceStatus()
+        await this.loadGpsChannelStatus()
         // 3. 重建中心标记
         this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
 
@@ -568,7 +677,7 @@ export default {
     },
     async loadDeviceStatus () {
       const res = await this.instance({ url: '/api/tcp/devicelist', method: 'get' })
-      console.log('【screen】读取的数据库设备列表/api/tcp/devicelist:', res.data)
+      console.log('【screen】读取的后台tcpserver在线设备列表/api/tcp/devicelist:', res.data)
       // 修改在线状态
       const list = res.data.list || []
       // 初始化：把接口返回的status同步到dbGreenMarkers的online
@@ -576,6 +685,23 @@ export default {
         const findDev = list.find(item => item.cid === marker.id)
         if (findDev) {
           marker.online = findDev.status === 'online'
+          marker.devChannelOnline = findDev.status
+          marker.sn = findDev.sn
+        }
+      })
+    },
+    // 4G DTU sn 需要配置数据库，才是完备的，未完成，20261022
+    async loadGpsChannelStatus () {
+      const res = await this.instance({ url: '/api/tcp/gpschannellist', method: 'get' })
+      console.log('【screen】读取的后台tcpserver在线GPS列表/api/tcp/devicelist:', res.data)
+      // 修改在线状态
+      const list = res.data.list || []
+      // 初始化：把接口返回的status同步到dbGreenMarkers的online
+      this.dbGreenMarkers.forEach(marker => {
+        const findDev = list.find(item => item.sn === marker.sn) // 应该比较SN，因为存在只有GPS通道的情况
+        if (findDev) {
+          marker.gpsChannelOnline = findDev.gpsStatus
+          marker.sn = findDev.sn
         }
       })
     },
@@ -637,7 +763,7 @@ export default {
 
     openDevicePanel (id) {
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
-      if (deviceItem && deviceItem.online === true) {
+      if (deviceItem && deviceItem.devChannelOnline === 'online') {
         this.remoteId = id
         this.showDevicePanel = true
       } else {
@@ -727,6 +853,7 @@ export default {
 
         await this.loadDbGreenPoints(deviceIcon)
         await this.loadDeviceStatus()
+        await this.loadGpsChannelStatus() // 须改进
         if (this.isDestroyed) return
 
         this.createCenterMarker(this.defaultLng, this.defaultLat, '地图中心')
@@ -848,11 +975,14 @@ export default {
 
           // 用普通对象存储可观察属性，AMap 对象用 defineProperty 设为不可枚举，阻止 Vue 深度劫持
           const item = {
+            sn: row.dtusn,
             id: row.catalogid,
             name: row.label,
             gcjLng,
             gcjLat,
             online: false,
+            devChannelOnline: '',
+            gpsChannelOnline: '',
             _handlers: {},
             _winDom: null
           }
@@ -878,7 +1008,7 @@ export default {
           item._handlers.dblclick = () => {
             if (this.isDestroyed) return
             const target = this.dbGreenMarkers.find(d => d.id === row.catalogid)
-            if (!target || !target.online) {
+            if (!target || !target.devChannelOnline === 'online') {
               this.showTip('设备离线，无法打开面板')
               return
             }
@@ -1134,6 +1264,7 @@ export default {
       // currPoint.online = true 20261020 cancel
       currPoint.gcjLng = data.gcjLng
       currPoint.gcjLat = data.gcjLat
+      currPoint.sn = data.sn
       console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅')
     },
 
@@ -1512,14 +1643,40 @@ export default {
 
 .search-input {
   width: calc(100% - 20px);
-  margin: 0 10px 12px 10px;
+  margin: 4px 10px 12px 10px;
   background: #0b2a5a;
   color: #fff;
   border: 1px solid #00ffff;
   padding: 6px;
   box-sizing: border-box;
 }
-
+/* tab */
+ .tab-bar {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px 8px 10px;
+}
+.tab-item {
+  padding: 5px 14px;
+  font-size: 13px;
+  color: #8ab8d8;
+  cursor: pointer;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  transition: all 0.2s ease;
+  &.active {
+    color: #00ffff;
+    border-color: #00ffff;
+    background: rgba(0, 255, 255, 0.1);
+  }
+  &:hover {
+    color: #00ffff;
+    border-color: rgba(0, 255, 255, 0.6);
+  }
+}
+/* tab end */
+/*device-table*/
 .device-table {
   width: calc(100% - 20px);
   margin: 0 10px;
@@ -1538,6 +1695,10 @@ export default {
   background: #023a70;
   color: #00ffff;
 }
+/* 第3列：4G序列号，长数字自动换行 */
+.device-table td:nth-child(3) {
+  word-break: break-all;
+}
 
 .offline {
   color: #ff2a2a;
@@ -1548,7 +1709,11 @@ export default {
   color: #00ff66;
   font-weight: bold;
 }
-
+.unknown {
+  color: #ffcc00;
+  font-weight: bold;
+}
+/*device-table end*/
 .screen-full {
   position: fixed !important;
   top: 0 !important;

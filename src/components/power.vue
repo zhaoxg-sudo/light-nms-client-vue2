@@ -77,6 +77,7 @@ export default {
         }
         // 【修改2】新建纯净普通对象，全部转为基础类型，不带__ob__
         let updatepoints = {
+          sn: String(rawGpsData.sn),
           cid: String(rawGpsData.cid),
           gcjLng: Number(gcjLng),
           gcjLat: Number(gcjLat)
