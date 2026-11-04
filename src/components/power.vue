@@ -79,6 +79,7 @@ export default {
         let updatepoints = {
           sn: String(rawGpsData.sn),
           cid: String(rawGpsData.cid),
+          status: String(rawGpsData.status),
           gcjLng: Number(gcjLng),
           gcjLat: Number(gcjLat)
         }
@@ -99,6 +100,13 @@ export default {
       // data: { sn, cid, status: 'online' | 'offline', time }
       // 在这里更新设备列表对应行的状态
       this.$store.dispatch('gpschannelonoffline', data)
+    })
+    // 4G dtu power_off alzrm
+    this.sockets.subscribe('dtupoweroff', (data) => {
+      console.log('🔔 4G dtu power_off', data)
+      // data: { sn, cid, status: 'online' | 'offline', time }
+      // 在这里更新设备列表对应行的状态
+      this.$store.dispatch('dtupoweroff', data)
     })
 
     this.$nextTick(async () => {

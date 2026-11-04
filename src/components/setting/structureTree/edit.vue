@@ -28,14 +28,21 @@
               </div>
             </div>
           </div>
-          <div class="col-md-6" v-if="upData.stationtype!=0">
-            <div class="form-group">
-              <label class="col-sm-6 control-label">协议类型</label>
-              <div class="col-sm-6">
-                <input type="text" class="form-control" v-model="upData.protocoltype" style="width:130px;">
-              </div>
+         <div class="col-md-6" v-if="upData.stationtype!=0">
+          <div class="form-group">
+            <label class="col-sm-6 control-label">协议类型</label>
+            <div class="col-sm-6">
+              <select class="form-control" v-model="upData.protocoltype" style="width:130px;">
+                <option value="">请选择</option>
+                <option value="2">4G-DTU</option>
+                <!-- <option value="3">TCP-CLIENT</option> -->
+              </select>
+              <!-- 调试放这里 -->
+      <!-- <p>debug: {{ upData.protocoltype }}</p> -->
             </div>
           </div>
+        </div>
+
           <!-- <div class="col-md-6 control-label" v-if="upData.stationtype!=0">
             <div class="form-group">
               <el-form-item  label="IP地址" prop="ipAddress">
@@ -51,7 +58,7 @@
              </el-form-item>
             </div>
           </div> -->
-          <!-- <div class="col-md-6" v-if="upData.stationtype!=0" prop="ipAddress">
+          <div class="col-md-6" v-if="upData.protocoltype === '3' && upData.stationtype!=0" prop="ipAddress">
             <div class="form-group">
               <label class="col-sm-6 control-label">IP地址</label>
               <div class="col-sm-6">
@@ -59,15 +66,15 @@
               </div>
             </div>
           </div>
-          <div class="col-md-6" v-if="upData.stationtype!=0">
+          <div class="col-md-6" v-if="upData.protocoltype === '3' && upData.stationtype!=0">
             <div class="form-group">
               <label class="col-sm-6 control-label">IP端口</label>
               <div class="col-sm-6">
                 <input type="text" class="form-control" v-model="upData.ipport" style="width:130px;">
               </div>
             </div>
-          </div> -->
-           <div class="col-md-6" v-if="upData.stationtype!=0">
+          </div>
+           <div class="col-md-6" v-if="upData.protocoltype === '2' && upData.stationtype!=0">
             <div class="form-group">
               <label class="col-sm-6 control-label">经度</label>
               <div class="col-sm-6">
@@ -75,7 +82,7 @@
               </div>
             </div>
           </div>
-          <div class="col-md-6" v-if="upData.stationtype!=0">
+          <div class="col-md-6" v-if="upData.protocoltype === '2' && upData.stationtype!=0">
             <div class="form-group">
               <label class="col-sm-6 control-label">维度</label>
               <div class="col-sm-6">
@@ -83,7 +90,7 @@
               </div>
             </div>
           </div>
-           <div class="col-md-6" v-if="upData.stationtype!=0">
+           <div class="col-md-6" v-if="upData.protocoltype === '2' && upData.stationtype!=0">
             <div class="form-group">
               <label class="col-sm-6 control-label">DTU序列号</label>
               <div class="col-sm-6">

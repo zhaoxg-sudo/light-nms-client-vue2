@@ -355,10 +355,40 @@ export default {
         })
       })
     },
+    // renderContent (h, { node, data, store }) {
+    //   console.log('enter into tree update status........')
+    //   console.log('renderContent:', this.stationStatus)
+    //   if (this.stationStatus === 'change') {
+    //     let neww = false
+    //     if (node.label === '新建站点') {
+    //       neww = true
+    //     } else {
+    //       neww = true
+    //     }
+    //     return (
+    //       <span class="custom-tree-node">
+    //         <span contenteditable = {neww} onkeydown={() => this.enter(event, data, node)} onblur = {() => this.renameDeviceGroupList(event, data, node)}>
+    //           {node.label}
+    //         </span>
+    //         <span>
+    //           <el-button size="mini" type="text" on-click={ () => this.addNode(node, data) }><i class = "fa fa-plus"></i></el-button>
+    //           <el-button size="mini" type="text" on-click={ () => this.remove(node, data) }><i class = "fa fa-minus"></i></el-button>
+    //         </span>
+    //       </span>)
+    //   } else {
+    //     return (
+    //       <span class="custom-tree-node">
+    //         <span>{node.label}</span>
+    //       </span>)
+    //   }
+    // },
     renderContent (h, { node, data, store }) {
-      console.log('enter into tree update status........')
+      console.log('enter into tree update status........', data.stationtype)
       console.log('renderContent:', this.stationStatus)
       if (this.stationStatus === 'change') {
+        // ==========【标记修改】只有组织节点stationtype=0才显示+-按钮 ==========
+        const showOperBtn = data.stationtype === '0'
+        // const showOperBtn = true
         let neww = false
         if (node.label === '新建站点') {
           neww = true
@@ -367,13 +397,17 @@ export default {
         }
         return (
           <span class="custom-tree-node">
-            <span contenteditable = {neww} onkeydown={() => this.enter(event, data, node)} onblur = {() => this.renameDeviceGroupList(event, data, node)}>
+            <span contenteditable = {neww} onkeydown={(event) => this.enter(event, data, node)} onblur = {() => this.renameDeviceGroupList(event, data, node)}>
               {node.label}
             </span>
-            <span>
-              <el-button size="mini" type="text" on-click={ () => this.addNode(node, data) }><i class = "fa fa-plus"></i></el-button>
-              <el-button size="mini" type="text" on-click={ () => this.remove(node, data) }><i class = "fa fa-minus"></i></el-button>
-            </span>
+            {
+              showOperBtn ? (
+                <span>
+                  <el-button size="mini" type="text" on-click={ () => this.addNode(node, data) }><i class = "fa fa-plus"></i></el-button>
+                  <el-button size="mini" type="text" on-click={ () => this.remove(node, data) }><i class = "fa fa-minus"></i></el-button>
+                </span>
+              ) : null
+            }
           </span>)
       } else {
         return (
@@ -382,6 +416,7 @@ export default {
           </span>)
       }
     },
+
     enter (event, data, node) {
       if (event.keyCode === 13) {
         console.log(event, data, node)

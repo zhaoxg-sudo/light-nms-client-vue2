@@ -420,7 +420,11 @@ export default {
     },
     'updatePoint': {
       handler (data) {
-        console.log('[screen] store->updatePoint :=', data)
+        if (data.status === 'unknown') {
+          console.warn('[screen] 未知设备store->updatePoint', data)
+        } else {
+          console.log('[screen] 合法设备store->updatePoint :=', data)
+        }
         if (!data || !data.cid) return
         this.updateMapPointByID(data)
       },
@@ -1256,6 +1260,7 @@ export default {
       if (!data || !data.cid) return
       const targetIndex = this.dbGreenMarkers.findIndex(item => (item.id || '').trim() === (data.cid || '').trim())
       if (targetIndex === -1) { console.warn('未匹配到该点位ID：', data.cid); return }
+      // 未匹配设备，另行处理，未实现
       const currPoint = this.dbGreenMarkers[targetIndex]
       if (!currPoint.marker || !currPoint.marker.getMap()) { console.warn('Marker脱离地图，无法更新'); return }
       currPoint.marker.setIcon(currPoint.greenIcon)
