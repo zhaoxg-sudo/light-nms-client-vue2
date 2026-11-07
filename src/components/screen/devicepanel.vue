@@ -16,17 +16,28 @@
     <div class="device-panel-dark">
       <!-- 顶部设备信息栏 -->
       <div class="top-bar">
-        <span class="info-item">
-          <span class="red-dot"></span>名称/编号: 样机
-        </span>
-        <span class="info-item">
-          <span class="red-dot"></span>型号: LT100
-        </span>
-        <span class="info-item">
-          <span class="red-dot"></span>状态: 在线
-        </span>
+        <div class="info-item">
+          <span class="info-label">名称：</span>
+          <span class="info-value">{{ devInfo.name || '--' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">类型：</span>
+          <span class="info-value">{{ devInfo.devType || '--' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">ID：</span>
+          <span class="info-value">{{ devInfo.id || '--' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">DTU：</span>
+          <span class="info-value">{{ devInfo.sn || '--' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">状态：</span>
+          <span class="status-dot" :class="devInfo.devChannelOnline"></span>
+          <span class="info-value">{{ getStatusText(devInfo.devChannelOnline) }}</span>
+        </div>
       </div>
-
       <!-- 快捷操作按钮区 -->
       <div class="action-bar">
         <el-button size="mini" type="success" @click="cmdAllOn">全通</el-button>
@@ -131,6 +142,12 @@ export default {
     remoteId: {
       type: String,
       default: ''
+    },
+    devInfo: {
+      type: Object,
+      default: function () {
+        return {}
+      }
     }
   },
   data () {
@@ -148,7 +165,18 @@ export default {
       })
     }
   },
+  mounted () {
+    console.log('devicepanel 接收父节点数据devInfo：', this.devInfo)
+  },
   methods: {
+    getStatusText (s) {
+      const map = {
+        online: '在线',
+        offline: '离线',
+        unknown: '身份异常'
+      }
+      return map[s] || s
+    },
     handleClose () {
       this.$emit('update:visible', false)
     },
@@ -179,17 +207,6 @@ export default {
           this.$message.warning(msg)
         }
       })
-      // try {
-      //   await fetch(this.$appHost + '/api/tcp/send', {
-      //     method: 'POST',
-      //     headers: { 'Content-Type': 'application/json' },
-      //     body: JSON.stringify({ clientKey: this.remoteId, content })
-      //   })
-      //   this.$message.success('指令下发成功')
-      // } catch (e) {
-      //   this.$message.error('指令下发失败')
-      //   console.error(e)
-      // }
     },
     async cmdAllOn () {
       this.switchLoops.forEach((item) => {
@@ -218,29 +235,46 @@ export default {
 </script>
 
 <style scoped>
-.device-panel-dark {
-  background: #0b1229;
-  color: #fff;
-  padding: 15px;
-  border-radius: 8px;
-}
-/* 顶部信息栏 */
 .top-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 24px;
   background: #303a70;
   padding: 8px 15px;
   border-radius: 4px;
   margin-bottom: 15px;
+  color:#fff;
+  font-size:14px;
 }
 .info-item {
-  margin-right: 20px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  margin-right:0;
 }
-.red-dot {
+.info-label {
+  color:#78c8e8;
+  margin-right:4px;
+}
+.status-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  background: #ff3b30;
-  border-radius: 50%;
-  margin-right: 5px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  margin-right:5px;
+}
+.status-dot.online {
+  background:#00ff66;
+  box-shadow:0 0 5px #00ff66;
+}
+.status-dot.offline {
+  background:#ff2a2a;
+  box-shadow:0 0 5px #ff2a2a;
+}
+.status-dot.unknown {
+  background:#ffcc00;
+  box-shadow:0 0 5px #ffcc00;
 }
 /* 操作按钮区 */
 .action-bar {

@@ -237,8 +237,8 @@ export default {
       let view = ''
       // console.log('detail in ', v)
       switch (v) {
-        case 'mastersw' :
-          view = '主开关故障'
+        case 'POWER_OFF' :
+          view = 'DTU断电'
           break
         case 'outov' :
           view = '输出过压'

@@ -89,6 +89,19 @@
                       <span :style="{color: dev.devChannelOnline === 'online' ? '#39ff5e' : '#ff4444'}">
                         {{ dev.devChannelOnline === 'online' ? '在线' : '离线' }}
                       </span>
+                   <span style="white-space: nowrap; margin-left:8px;">
+  <el-button
+    v-if="dev.devChannelOnline === 'online'"
+    size="mini"
+    type="primary"
+    class="quick-panel-btn"
+    style="padding:0 4px;height:20px;font-size:11px;"
+    @click.stop="openDevicePanel(dev.id)"
+  >
+    设备面板
+  </el-button>
+</span>
+
                     </div>
                   </div>
                   <div v-if="matchPoiList.length" class="dropdown-group-title">地理位置</div>
@@ -256,7 +269,7 @@
         </dv-border-box-1>
       </div>
 
-      <DeviceControlPanel :visible.sync="showDevicePanel" :remoteId="remoteId" />
+      <DeviceControlPanel :visible.sync="showDevicePanel" :remoteId="remoteId" :devInfo="devInfo"/>
       <MainControlPanel :visible="showMainPanel" @close="showMainPanel = false" />
       <OperLogPanel :visible.sync="operLogVisible" />
       <div class="point-mask" v-if="showPointDialog">
@@ -316,6 +329,7 @@ export default {
       textLabel: null,
       deviceOnline: false,
       remoteId: '',
+      devInfo: {},
       lastGps: null,
       showDevicePanel: false,
       showMainPanel: false,
@@ -769,6 +783,16 @@ export default {
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
       if (deviceItem && deviceItem.devChannelOnline === 'online') {
         this.remoteId = id
+        this.devInfo.id = deviceItem.id
+        this.devInfo.name = deviceItem.name
+        this.devInfo.sn = deviceItem.sn
+        this.devInfo.online = deviceItem.online
+        this.devInfo.devChannelOnline = deviceItem.devChannelOnline
+        this.devInfo.gpsChannelOnline = deviceItem.gpsChannelOnline
+        this.devInfo.gcjLat = deviceItem.gcjLat
+        this.devInfo.gcjLng = deviceItem.gcjLng
+        this.devInfo.devType = '直流柜'
+        console.log('openDevicePanel传入的', this.devInfo)
         this.showDevicePanel = true
       } else {
         this.showTip('该设备当前离线，无法打开设备控制面板！')
@@ -1946,7 +1970,7 @@ export default {
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  width: 260px;
+  width: 300px;
   z-index: 1005;
 }
 
@@ -1996,6 +2020,7 @@ export default {
 }
 
 .search-dropdown-panel {
+  width: 100%; /* 加上这一行，下拉和输入框同宽 */
   margin-top: 6px;
   background: rgba(11, 18, 41, 0.96);
   border: 1px solid #00ffff;
