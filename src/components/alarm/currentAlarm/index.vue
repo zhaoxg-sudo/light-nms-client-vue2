@@ -78,6 +78,7 @@
 
 <script>
 import { mapGetters } from 'vuex'
+import { GET_USER_INFO } from '@/store/getters/type'
 export default {
   name: 'alarm',
   data () {
@@ -115,7 +116,8 @@ export default {
   },
   computed: {
     ...mapGetters({
-      alarmReport: 'alarmReport'
+      alarmReport: 'alarmReport',
+      get_user_info: GET_USER_INFO
     })
   },
   watch: {
@@ -151,6 +153,9 @@ export default {
       alarmReportTem.restoreflag = (alarmReport.alarmrestoreflag === 'true')
       alarmReportTem.restoreinfo = alarmReport.alarmrestoreinfo
       alarmReportTem.sourceip = alarmReport.sourceip
+      alarmReportTem.alarmdtusn = alarmReport.alarmdtusn
+      alarmReportTem.alarmdevtype = alarmReport.alarmdevtype
+      alarmReportTem.tenantname = alarmReport.tenantname
       this.alarmparameter.push(alarmReportTem)
     },
     async refresh () {
@@ -369,7 +374,10 @@ export default {
           toHistoryAlarm.alarmsourceip = toHistoryAlarm.sourceip
           toHistoryAlarm.alarmconfirmedflag = true
           toHistoryAlarm.alarmconfirmedtime = confirmedtime
-          toHistoryAlarm.alarmconfirmedinfo = this.alarmConfiredText
+          toHistoryAlarm.alarmconfirmedinfo = this.alarmConfiredText + '。 确认用户：' + this.get_user_info.user.username
+          toHistoryAlarm.alarmdtusn = toHistoryAlarm.alarmdtusn
+          toHistoryAlarm.alarmdevtype = toHistoryAlarm.alarmdevtype
+          toHistoryAlarm.tenantname = toHistoryAlarm.tenantname
           this.instance({
             'url': '/alarm/current/update',
             data: toHistoryAlarm,

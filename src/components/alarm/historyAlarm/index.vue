@@ -117,6 +117,7 @@
 
 <script>
 import { mapGetters } from 'vuex'
+import { GET_USER_INFO } from '@/store/getters/type'
 export default {
   name: 'alarm',
   data () {
@@ -186,7 +187,8 @@ export default {
   },
   computed: {
     ...mapGetters({
-      alarmReport: 'alarmReport'
+      alarmReport: 'alarmReport',
+      get_user_info: GET_USER_INFO
     })
   },
   watch: {
@@ -241,7 +243,7 @@ export default {
       let alarmReportTem = {}
       let alarmReport = report
       alarmReportTem.id = alarmReport.alarmid
-      alarmReportTem.mudid = alarmReport.alarmmudid
+      alarmReportTem.mudid = alarmReport.alarmstation
       alarmReportTem.receivedtime = alarmReport.alarmreceivedtime
       alarmReportTem.firedtime = alarmReport.alarmfiredtime
       alarmReportTem.detail = alarmReport.alarmdetail
@@ -320,7 +322,10 @@ export default {
           toHistoryAlarm.alarmsourceip = toHistoryAlarm.sourceip
           toHistoryAlarm.alarmconfirmedflag = true
           toHistoryAlarm.alarmconfirmedtime = confirmedtime
-          toHistoryAlarm.alarmconfirmedinfo = this.alarmConfiredText
+          toHistoryAlarm.alarmconfirmedinfo = this.alarmConfiredText + '。 确认用户：' + this.get_user_info.user.username
+          toHistoryAlarm.alarmdtusn = toHistoryAlarm.alarmdtusn
+          toHistoryAlarm.alarmdevtype = toHistoryAlarm.alarmdevtype
+          toHistoryAlarm.tenantname = toHistoryAlarm.tenantname
           this.instance({
             'url': '/alarm/history/update',
             data: toHistoryAlarm,
@@ -369,6 +374,9 @@ export default {
       let view = ''
       // console.log('detail in ', v)
       switch (v) {
+        case 'POWER_OFF' :
+          view = 'DTU断电'
+          break
         case 'mastersw' :
           view = '主开关故障'
           break
