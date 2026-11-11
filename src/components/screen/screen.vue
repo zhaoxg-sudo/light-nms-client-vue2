@@ -465,13 +465,41 @@ export default {
         console.log('[screen] store->gpschannelonoffline :=', data)
         if (!data || !data.sn) return
         const targetMarker = this.dbGreenMarkers.find(m => m.sn === data.sn)
-        if (targetMarker) {
+        if (!targetMarker) return
+
+        // ✏️【MODIFIED】online：覆盖绑定的clientKey，直接更新状态
+        if (data.status === 'online') {
+          targetMarker._gpsClientKey = data.clientKey
           targetMarker.gpsChannelOnline = data.status
-          console.log('[screen] gpschannelonoffline 在线状态改变，点位cid=', data.sn, data.status)
+          console.log('[screen] gps online，更新绑定clientKey=', data.clientKey, 'sn=', data.sn)
+          return
         }
+
+        // ✏️【MODIFIED】offline / unknown：校验clientKey，不一致直接丢弃
+        if (targetMarker._gpsClientKey !== data.clientKey) {
+          console.log(`[GPS前端过滤] SN:${data.sn} 旧连接离线消息丢弃，消息key:${data.clientKey},点位绑定key:${targetMarker._gpsClientKey}`)
+          return
+        }
+
+        // ✏️【MODIFIED】key匹配，才更新离线
+        targetMarker.gpsChannelOnline = data.status
+        console.log('[screen] gpschannelonoffline 在线状态改变，点位sn=', data.sn, data.status)
       },
       deep: true
     }
+
+    // 'gpschannelonoffline': {
+    //   handler (data) {
+    //     console.log('[screen] store->gpschannelonoffline :=', data)
+    //     if (!data || !data.sn) return
+    //     const targetMarker = this.dbGreenMarkers.find(m => m.sn === data.sn)
+    //     if (targetMarker) {
+    //       targetMarker.gpsChannelOnline = data.status
+    //       console.log('[screen] gpschannelonoffline 在线状态改变，点位cid=', data.sn, data.status)
+    //     }
+    //   },
+    //   deep: true
+    // }
   },
 
   created () {
@@ -711,15 +739,17 @@ export default {
     // 4G DTU sn 需要配置数据库，才是完备的，未完成，20261022
     async loadGpsChannelStatus () {
       const res = await this.instance({ url: '/api/tcp/gpschannellist', method: 'get' })
-      console.log('【screen】读取的后台tcpserver在线GPS列表/api/tcp/devicelist:', res.data)
+      console.log('【screen】读取的后台tcpserver在线GPS列表/api/tcp/gpschannellist:', res.data)
       // 修改在线状态
       const list = res.data.list || []
       // 初始化：把接口返回的status同步到dbGreenMarkers的online
       this.dbGreenMarkers.forEach(marker => {
-        const findDev = list.find(item => item.sn === marker.sn) // 应该比较SN，因为存在只有GPS通道的情况
+        const findDev = list.find(item => item.sn === marker.sn) // 应该比较SN，因为存在只有GPS通道的情况,且要处理僵尸通道的问题
         if (findDev) {
           marker.gpsChannelOnline = findDev.gpsStatus
           marker.sn = findDev.sn
+          // ✏️【MODIFIED】页面初始化，把接口返回的clientKey绑定到点位对象
+          marker._gpsClientKey = findDev.clientKey
         }
       })
     },
@@ -1011,6 +1041,8 @@ export default {
             online: false,
             devChannelOnline: '',
             gpsChannelOnline: '',
+            // ✏️【MODIFIED】预留GPS连接key，用来校验离线消息
+            _gpsClientKey: null,
             _handlers: {},
             _winDom: null
           }
