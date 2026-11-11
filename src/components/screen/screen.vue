@@ -455,7 +455,13 @@ export default {
         if (targetMarker) {
           targetMarker.online = (data.status === 'online')
           targetMarker.devChannelOnline = data.status
-          console.log('[screen] deviceonoffline 在线状态改变，点位cid=', data.cid, data.status)
+          // ✏️【MODIFIED】图标只看业务通道状态，和GPS无关
+          if (targetMarker.devChannelOnline === 'online') {
+            targetMarker.marker.setIcon(targetMarker.greenIcon)
+          } else {
+            targetMarker.marker.setIcon(targetMarker.grayIcon)
+          }
+          console.log('[screen] deviceonoffline 在线状态改变，✅刷新地图图标，点位cid=', data.cid, data.status)
         }
       },
       deep: true
@@ -471,6 +477,12 @@ export default {
         if (data.status === 'online') {
           targetMarker._gpsClientKey = data.clientKey
           targetMarker.gpsChannelOnline = data.status
+          // // ✏️【MODIFIED】图标只看业务通道状态，和GPS无关
+          // if (targetMarker.devChannelOnline === 'online') {
+          //   targetMarker.marker.setIcon(targetMarker.greenIcon)
+          // } else {
+          //   targetMarker.marker.setIcon(targetMarker.grayIcon)
+          // }
           console.log('[screen] gps online，更新绑定clientKey=', data.clientKey, 'sn=', data.sn)
           return
         }
@@ -733,6 +745,12 @@ export default {
           marker.online = findDev.status === 'online'
           marker.devChannelOnline = findDev.status
           marker.sn = findDev.sn
+          // ✏️【MODIFIED】初始化加载状态，同步切换marker图标
+          if (marker.devChannelOnline === 'online') {
+            marker.marker.setIcon(marker.greenIcon)
+          } else {
+            marker.marker.setIcon(marker.grayIcon)
+          }
         }
       })
     },
@@ -1014,6 +1032,8 @@ export default {
               <div>ID：${row.catalogid}</div>
               <div>名称：${row.label || ''}</div>
               <div>类型：${row.protocoltype || ''}</div>
+              <div>直流柜状态：<span class="status-dev">--</span></div>
+              <div>4G-DTU状态：<span class="status-gps">--</span></div>
               <div>GCJ经纬度：${gcjLng},${gcjLat}</div>
               <div>WGS经纬度：${row.gpslng || ''},${row.gpslat || ''}</div>
               <button class="device-panel-btn" data-cid="${row.catalogid}" style="width:100%;height:32px;margin-top:10px;border:none;border-radius:4px;background:#0a78ff;color:#fff;font-size:13px;cursor:pointer;pointer-events:auto;">设备控制面板</button>
@@ -1080,6 +1100,32 @@ export default {
           marker.on('mouseout', item._handlers.mouseout)
           marker.on('dblclick', item._handlers.dblclick)
 
+          // item._handlers.open = () => {
+          //   const timerId = setTimeout(() => {
+          //     if (this.isDestroyed) return
+          //     const winDom = mainInfoWin.getContentDom()
+          //     if (!winDom) return
+          //     item._winDom = winDom
+          //     winDom.onmouseenter = () => {
+          //       if (this.globalHoverTimer) { clearTimeout(this.globalHoverTimer); this.globalHoverTimer = null }
+          //     }
+          //     winDom.onmouseleave = () => {
+          //       this.globalHoverTimer = setTimeout(() => {
+          //         if (!this.isDestroyed) mainInfoWin.close()
+          //         this.globalHoverTimer = null
+          //       }, 500)
+          //     }
+          //     const btn = winDom.querySelector('.device-panel-btn')
+          //     if (btn) {
+          //       btn.onclick = (e) => {
+          //         e.stopPropagation()
+          //         mainInfoWin.close()
+          //         if (!this.isDestroyed) this.openDevicePanel(row.catalogid)
+          //       }
+          //     }
+          //   }, 150)
+          //   this.infoWinOpenTimers.push(timerId)
+          // }
           item._handlers.open = () => {
             const timerId = setTimeout(() => {
               if (this.isDestroyed) return
@@ -1095,6 +1141,39 @@ export default {
                   this.globalHoverTimer = null
                 }, 500)
               }
+              // ✏️【MODIFIED】动态填充状态
+              const devSpan = winDom.querySelector('.status-dev')
+              const gpsSpan = winDom.querySelector('.status-gps')
+              if (devSpan) {
+                let text, color
+                if (item.devChannelOnline === 'online') {
+                  text = '在线'
+                  color = '#00ff66'
+                } else if (item.devChannelOnline === 'unknown') {
+                  text = '身份异常'
+                  color = '#ffcc00'
+                } else {
+                  text = '离线'
+                  color = '#ff2a2a'
+                }
+                devSpan.textContent = text
+                devSpan.style.color = color
+              }
+              if (gpsSpan) {
+                let text, color
+                if (item.gpsChannelOnline === 'online') {
+                  text = '在线'
+                  color = '#00ff66'
+                } else if (item.gpsChannelOnline === 'unknown') {
+                  text = '身份异常'
+                  color = '#ffcc00'
+                } else {
+                  text = '离线'
+                  color = '#ff2a2a'
+                }
+                gpsSpan.textContent = text
+                gpsSpan.style.color = color
+              }
               const btn = winDom.querySelector('.device-panel-btn')
               if (btn) {
                 btn.onclick = (e) => {
@@ -1106,6 +1185,7 @@ export default {
             }, 150)
             this.infoWinOpenTimers.push(timerId)
           }
+
           mainInfoWin.on('open', item._handlers.open)
 
           this.dbGreenMarkers.push(item)
@@ -1319,14 +1399,14 @@ export default {
       // 未匹配设备，另行处理，未实现
       const currPoint = this.dbGreenMarkers[targetIndex]
       if (!currPoint.marker || !currPoint.marker.getMap()) { console.warn('Marker脱离地图，无法更新'); return }
-      currPoint.marker.setIcon(currPoint.greenIcon)
+      // currPoint.marker.setIcon(currPoint.greenIcon)
       currPoint.marker.setPosition([data.gcjLng, data.gcjLat])
       if (currPoint.label) currPoint.label.setPosition([data.gcjLng, data.gcjLat])
       // currPoint.online = true 20261020 cancel
       currPoint.gcjLng = data.gcjLng
       currPoint.gcjLat = data.gcjLat
       currPoint.sn = data.sn
-      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字已刷新✅')
+      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字不刷新，只改经纬度✅')
     },
 
     locateCenterMarker () {
