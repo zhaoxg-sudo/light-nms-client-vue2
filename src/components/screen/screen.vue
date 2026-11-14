@@ -489,7 +489,7 @@ export default {
 
         // ✏️【MODIFIED】offline / unknown：校验clientKey，不一致直接丢弃
         if (targetMarker._gpsClientKey !== data.clientKey) {
-          console.log(`[GPS前端过滤] SN:${data.sn} 旧连接离线消息丢弃，消息key:${data.clientKey},点位绑定key:${targetMarker._gpsClientKey}`)
+          console.warn(`[✏️GPS前端过滤] SN:${data.sn} 旧连接离线消息丢弃，消息key:${data.clientKey},点位绑定key:${targetMarker._gpsClientKey}`)
           return
         }
 

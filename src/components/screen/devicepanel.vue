@@ -127,13 +127,21 @@
           <p class="brightness-val">亮度: {{ item.brightness }}</p>
         </div>
       </div>
+      <!-- ========== 新增：告警管理页面组件 ========== -->
+      <div style="margin-top:16px;">
+        <AlarmHandleTab :bindStationId="devInfo.id" />
+      </div>
     </div>
   </el-dialog>
 </template>
 
 <script>
+import AlarmHandleTab from '@/components/screen/alarmHandleTab.vue'
 export default {
   name: 'DeviceControlPanel',
+  components: {
+    AlarmHandleTab
+  },
   props: {
     visible: {
       type: Boolean,
@@ -411,5 +419,19 @@ export default {
   font-size: 46px !important;
   font-weight: bold !important;
   color: #00ffff !important;
+}
+
+/* ========== 新增：解决内嵌告警tab白色底板 ========== */
+::v-deep .dark-panel-dialog .el-tab-pane {
+  background-color: #0b1229 !important;
+}
+::v-deep .dark-panel-dialog .el-tabs__content {
+  background-color: #0b1229 !important;
+}
+::v-deep .dark-panel-dialog .el-table__empty-block {
+  background-color: #0b1229 !important;
+}
+::v-deep .dark-panel-dialog .el-table__body-wrapper {
+  background-color: #0b1229 !important;
 }
 </style>
