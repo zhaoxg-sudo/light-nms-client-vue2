@@ -15,7 +15,7 @@
             style="width:100%"
           >
             <el-table-column label="告警ID" prop="id" width="220" />
-            <el-table-column label="站点ID" prop="mudid" width="180" />
+            <!-- <el-table-column label="站点ID" prop="mudid" width="180" /> -->
             <el-table-column label="站点名称" prop="stationName" width="180" />
             <el-table-column label="告警发生时间" prop="firedtime" width="180" />
             <el-table-column label="告警类型" prop="detailViewText" />
@@ -44,7 +44,7 @@
                   size="mini"
                   type="primary"
                   :disabled="scope.row.confirmedflag"
-                  @click="openConfirmDialog(scope.row)"
+                  @click="openConfirmDialog(scope.row, 'current')"
                 >
                   确认告警
                 </el-button>
@@ -67,9 +67,9 @@
           >
             <el-button size="mini" type="success">导出Excel</el-button>
           </downloadExcel>
-          <el-select v-model="filterStationId" clearable placeholder="选择站点" @change="onStationChange">
+          <!-- <el-select v-model="filterStationId" clearable placeholder="选择站点" @change="onStationChange">
             <el-option :key="item.catalogid" :label="item.label" :value="item.catalogid" v-for="item in stationTreeList" />
-          </el-select>
+          </el-select> -->
           <el-date-picker
             v-model="timeRange"
             type="datetimerange"
@@ -90,7 +90,7 @@
             style="width:100%"
           >
             <el-table-column label="告警ID" prop="id" width="220" />
-            <el-table-column label="站点ID" prop="mudid" width="180" />
+            <!-- <el-table-column label="站点ID" prop="mudid" width="180" /> -->
             <el-table-column label="站点名称" prop="stationName" width="180" />
             <el-table-column label="告警发生时间" prop="firedtime" width="180" />
             <el-table-column label="告警类型" prop="detailViewText" />
@@ -112,8 +112,20 @@
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="恢复时间" prop="restoretime" width="180" />
+            <!-- <el-table-column label="恢复时间" prop="restoretime" width="180" /> -->
             <el-table-column label="恢复备注" prop="restoreinfo" />
+            <el-table-column label="操作" width="120">
+              <template slot-scope="scope">
+                <el-button
+                  size="mini"
+                  type="primary"
+                  :disabled="scope.row.confirmedflag"
+                  @click="openConfirmDialog(scope.row, 'history')"
+                >
+                  确认告警
+                </el-button>
+              </template>
+            </el-table-column>
           </el-table>
 
           <div class="pagination-wrap">
@@ -175,6 +187,8 @@ export default {
       confirmDialogVisible: false,
       curAlarm: {},
       confirmText: '',
+      // ==========【新增】标记来源：current / history ==========
+      alarmSource: 'current',
       page: {
         pageIndex: 1,
         pageSize: 10,
@@ -216,6 +230,15 @@ export default {
         // this.loadCurrentAlarm()
         // this.resetHistoryPage()
         // this.loadHistoryAlarm()
+      }
+    },
+    // ==========【新增】tab切换自动刷新 ==========
+    alarmTab (newVal) {
+      if (newVal === 'current') {
+        this.loadCurrentAlarm()
+      } else if (newVal === 'history') {
+        this.resetHistoryPage()
+        this.loadHistoryAlarm()
       }
     }
   },
@@ -261,10 +284,11 @@ export default {
       return map[v] || v
     },
     formatAlarmItem (row) {
+      const stationItem = this.stationTreeList.find(item => String(item.catalogid) === String(row.alarmstation))
       return {
         id: row.alarmid,
         mudid: row.alarmmudid, // 修复：alarmmudid 才是站点ID
-        stationName: row.alarmstation,
+        stationName: stationItem ? stationItem.label : row.alarmstation, // 匹配到显示名称，没匹配显示ID
         firedtime: row.alarmfiredtime,
         detail: row.alarmdetail,
         detailViewText: this.getDetailText(row.alarmdetail),
@@ -367,29 +391,42 @@ export default {
     resetHistoryPage () {
       this.page.pageIndex = 1
     },
-    openConfirmDialog (row) {
+    // ==========【修改】传入来源标记 ==========
+    openConfirmDialog (row, source) {
       this.curAlarm = row
       this.confirmText = ''
+      this.alarmSource = source
       this.confirmDialogVisible = true
     },
     async submitAlarmConfirm () {
       try {
         const confirmTime = this.getNowTime()
-        // 只传后端需要字段，不要全量raw对象
         const payload = {
           alarmid: this.curAlarm.id,
           alarmconfirmedflag: true,
           alarmconfirmedtime: confirmTime,
           alarmconfirmedinfo: `${this.confirmText}。确认用户：${this.get_user_info.user.username}`
         }
+        // ==========【新增】根据来源选择接口 ==========
+        let apiUrl = ''
+        if (this.alarmSource === 'current') {
+          apiUrl = '/alarm/current/update'
+        } else {
+          apiUrl = '/alarm/history/update'
+        }
         await this.instance({
-          url: '/alarm/current/update',
+          url: apiUrl,
           method: 'post',
           data: payload
         })
         this.confirmDialogVisible = false
         this.$message.success('告警确认成功')
-        this.loadCurrentAlarm()
+        // 确认成功后，刷新对应列表
+        if (this.alarmSource === 'current') {
+          this.loadCurrentAlarm()
+        } else {
+          this.loadHistoryAlarm()
+        }
       } catch (err) {
         this.$message.error('告警确认提交失败')
         console.error('submitAlarmConfirm err', err)
@@ -595,4 +632,5 @@ export default {
   color: #fff;
   border-color: #334b75;
 }
+
 </style>

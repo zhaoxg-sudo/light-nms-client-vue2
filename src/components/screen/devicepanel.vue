@@ -53,6 +53,16 @@
         <el-button size="mini" type="primary">远程重启</el-button>
       </div>
 
+      <!-- ========== 新增：点灯自动工作模式组件 ========== -->
+      <div class="auto-mode-container" style="margin:12px 0;">
+        <DeviceAutoMode
+          :sn="currentSn"
+          @run-mode="handleRunMode"
+          @add-mode="handleAddMode"
+          @save-offset="handleSaveOffset"
+        />
+      </div>
+
       <!-- 三相电 + 功耗参数区 -->
       <div class="param-row">
         <div class="param-card phase-card">
@@ -137,10 +147,12 @@
 
 <script>
 import AlarmHandleTab from '@/components/screen/alarmHandleTab.vue'
+import DeviceAutoMode from '@/components/screen/deviceAutoMode.vue'
 export default {
   name: 'DeviceControlPanel',
   components: {
-    AlarmHandleTab
+    AlarmHandleTab,
+    DeviceAutoMode
   },
   props: {
     visible: {
@@ -177,6 +189,18 @@ export default {
     console.log('devicepanel 接收父节点数据devInfo：', this.devInfo)
   },
   methods: {
+    // ========== 自动模式回调 ==========
+    handleRunMode (mode, sn) {
+      console.log('执行当前模式', mode, sn)
+      // 这里调用后端接口：下发执行模式
+    },
+    handleAddMode () {
+      console.log('新增模式')
+    },
+    handleSaveOffset (val, sn) {
+      console.log('保存日出日落偏差', val, sn)
+      // 这里调用后端接口：保存偏差
+    },
     getStatusText (s) {
       const map = {
         online: '在线',
@@ -433,5 +457,28 @@ export default {
 }
 ::v-deep .dark-panel-dialog .el-table__body-wrapper {
   background-color: #0b1229 !important;
+}
+.device-panel-dark {
+  color: #fff;
+}
+.top-bar {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+.online-text {
+  color: #67c23a;
+}
+.offline-text {
+  color: #f56c6c;
+}
+</style>
+<style>
+.dark-panel-dialog .el-dialog__header,
+.dark-panel-dialog .el-dialog__body {
+  background-color: #101828;
+}
+.dark-panel-dialog .el-dialog__body {
+  padding: 12px 16px;
 }
 </style>
