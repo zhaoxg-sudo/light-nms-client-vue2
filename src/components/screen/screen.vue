@@ -6,7 +6,7 @@
       <div class="top-title">LED智慧照明管理平台</div>
       <div class="top-right">
         <button class="btn" @click="refreshAll">刷新</button>
-        <button class="btn" @click="toggleFullScreen($event)">{{ isFullScreen ? '退出大屏' : '大屏' }}</button>
+        <button class="btn" @click="toggleFullScreen">{{ isFullScreen ? '退出大屏' : '大屏' }}</button>
         <button class="btn" :style="{background: onlyMapMode ? '#00c48c' : '#00ffff'}" @click="switchOnlyMap">
           {{ onlyMapMode ? '退出全地图' : '全地图' }}
         </button>
@@ -847,23 +847,37 @@ export default {
       }
     },
 
-    toggleFullScreen (e) {
-      const targetDom = document.querySelector('.screen-page')
-      if (!this.isFullScreen) {
-        targetDom.requestFullscreen().catch(err => console.warn('全屏开启失败', err))
-        this.isFullScreen = true
-      } else {
-        document.exitFullscreen()
-        this.isFullScreen = false
+    // toggleFullScreen (e) {
+    //   const targetDom = document.querySelector('.screen-page')
+    //   if (!this.isFullScreen) {
+    //     targetDom.requestFullscreen().catch(err => console.warn('全屏开启失败', err))
+    //     this.isFullScreen = true
+    //   } else {
+    //     document.exitFullscreen()
+    //     this.isFullScreen = false
+    //   }
+    //   e.target.blur()
+    // },
+    async toggleFullScreen () {
+      try {
+        if (!document.fullscreenElement) {
+          // 进入全屏（和F11效果一致）
+          await document.documentElement.requestFullscreen()
+          this.isFullScreen = true
+        } else {
+          // 退出全屏
+          await document.exitFullscreen()
+          this.isFullScreen = false
+        }
+      } catch (err) {
+        console.error('全屏失败：', err)
       }
-      e.target.blur()
+      // e.target.blur()
     },
-
     toggleDrawMode () {
       this.drawPointMode = !this.drawPointMode
       if (this.drawPointMode) this.showTip('已开启点位配置，点击地图任意位置弹出录入窗口')
     },
-
     clearAllManualPoint () {
       this.manualMarkers.forEach(item => {
         if (item.marker) {
@@ -1855,20 +1869,20 @@ export default {
   font-weight: bold;
 }
 /*device-table end*/
-.screen-full {
+/* .screen-full {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  z-index: 9999 !important;
+  z-index: 999 !important;
   overflow: hidden !important;
 }
 
 .screen-full .content-screen {
   height: calc(100% - 60px) !important;
   padding-bottom: 15px !important;
-}
+} */
 
 .map-tool-bar {
   position: absolute;
@@ -1940,7 +1954,7 @@ export default {
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.7);
-  z-index: 99999;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;

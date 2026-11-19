@@ -147,15 +147,24 @@
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 添加/编辑任务弹窗 -->
+    <!-- 添加/编辑任务弹窗 ✅【改动：标题插槽居中对齐、修正层级参数】 -->
     <el-dialog
       title="添加任务"
       :visible.sync="taskDialogVisible"
       width="520px"
-      custom-class="dark-auto-dialog"
+      top="15vh"
+      :close-on-click-modal="false"
       append-to-body
-      :modal-append-to-body="false"
+      @close="handleCloseDialog"
+      custom-class="dark-auto-dialog"
     >
+      <!-- ✅ 新增标题插槽，和设备面板、操作日志样式统一 -->
+      <template slot="title">
+        <div style="width:100%;text-align:center;">
+          <span style="font-size:22px;font-weight:bold;color:#40c9ff;letter-spacing:2px;">添加任务</span>
+        </div>
+      </template>
+
       <div class="dialog-top-row">
         <span>定时方式</span>
         <el-radio-group v-model="formTaskType" size="mini">
@@ -317,6 +326,10 @@ export default {
     },
     quickAllPass () {
       this.tempBright = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+    },
+    // ✅ 新增弹窗关闭回调
+    handleCloseDialog () {
+      this.editIndex = -1
     }
   }
 }
@@ -512,27 +525,36 @@ export default {
   color: #5a6a85 !important;
 }
 
-/* 弹窗 dark-auto-dialog */
+/* ========== 弹窗暗黑样式 + 层级修复【重点改动】 ========== */
+.dark-auto-dialog .el-dialog__wrapper {
+  z-index: 999999 !important;
+}
+.dark-auto-dialog .v-modal {
+  z-index: 999998 !important;
+}
 .dark-auto-dialog .el-dialog__header,
 .dark-auto-dialog .el-dialog__body,
 .dark-auto-dialog .el-dialog__footer {
-  background-color: #152036 !important;
+  background-color: #152836 !important;
   color: #ffffff !important;
 }
 .dark-auto-dialog .el-input__inner {
-  background: #1a2944 !important;
-  border-color: #2c4268 !important;
+  background: #0f1f2b !important;
+  border-color: #2b5068 !important;
+  color: #fff !important;
+}
+.dark-auto-dialog .el-radio__label {
   color: #fff !important;
 }
 .dark-auto-dialog .el-button {
-  background-color: #1a2b48 !important;
-  color: #ffffff !important;
-  border-color: #334b75 !important;
+  background-color: #1f4b66 !important;
+  border-color: #38789c !important;
+  color: #fff !important;
 }
 .dark-auto-dialog .el-button:hover {
-  background-color: #182b4a !important;
-  color: #40c9ff !important;
-  border-color: #40c9ff !important;
+  background-color: #2b6488 !important;
+  border-color: #4096c4 !important;
+  color: #fff !important;
 }
 
 /* 组件内按钮 */
@@ -560,5 +582,13 @@ export default {
   background-color: #c43838 !important;
   color: #fff !important;
   border-color: #c43838 !important;
+}
+/* 遮罩 */
+.dark-auto-dialog .el-dialog__wrapper {
+  z-index: 20000 !important;
+}
+/* 弹窗主体 */
+.dark-auto-dialog {
+  z-index: 20001 !important;
 }
 </style>
