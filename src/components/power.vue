@@ -6,7 +6,7 @@
       <switchLeft></switchLeft>
       <treeList></treeList>
       <audio ref = "alarm"  src = "alarm.mp3" >
-      <audio ref = "voice"  src = "voice.mp3" >
+      <audio ref = "restore"  src = "restore.mp3" >
   </div>
 </template>
 
@@ -31,7 +31,8 @@ export default {
       remoteId: '',
       deviceOnline: false,
       lastGps: null,
-
+      // ✅【改】新增播放标记，ws只改这个标记
+      playSignal: '', // '' / 'alarm' / 'restore'
       instance: this.$ajax.create({
         baseURL: this.$appHost
       })
@@ -48,6 +49,42 @@ export default {
     ...mapGetters({
       get_user_info: GET_USER_INFO
     })
+  },
+  // ✅【改】watch监听播放信号，播放逻辑放到watch（脱离websocket回调栈）
+  watch: {
+    playSignal (val) {
+      if (!val) return
+      const audio = val === 'alarm' ? window.__alarmAudio : window.__voiceAudio
+      if (!audio) return
+      audio.currentTime = 0
+      audio.play().catch(err => {
+        if (err.name !== 'NotAllowedError') console.log('play err：', err)
+      })
+      this.playSignal = ''
+    }
+    // playSignal (val) {
+    //   console.log('\n进入音乐播放watch：', val)
+    //   if (!val) return
+    //   if (val === 'alarm') {
+    //     const audio = this.$refs.alarm
+    //     audio.currentTime = 0
+    //     audio.play().catch(err => {
+    //       if (err.name !== 'NotAllowedError') {
+    //         console.log('\nalarm play err：', err)
+    //       }
+    //     })
+    //   } else if (val === 'restore') {
+    //     const audio = this.$refs.restore
+    //     audio.currentTime = 0
+    //     audio.play().catch(err => {
+    //       if (err.name !== 'NotAllowedError') {
+    //         console.log('\nvoice play err：', err)
+    //       }
+    //     })
+    //   }
+    //   // 信号消费完成，清空
+    //   this.playSignal = ''
+    // }
   },
   created () {
     this.username = this.get_user_info.user.username
@@ -104,6 +141,12 @@ export default {
     // 4G dtu power_off alzrm
     this.sockets.subscribe('dtupoweroff', (data) => {
       console.log('🔔 4G dtu power_off', data)
+      // ✅【改】ws回调里面只设置标记，不调用play
+      if (data.status === 'poweroff') {
+        this.playSignal = 'alarm'
+      } else if (data.status === 'poweron') {
+        this.playSignal = 'restore'
+      }
       // data: { sn, cid, status: 'online' | 'offline', time }
       // 在这里更新设备列表对应行的状态
       this.$store.dispatch('dtupoweroff', data)

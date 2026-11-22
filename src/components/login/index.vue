@@ -88,6 +88,17 @@ export default {
         this.showTip('密码不能为空')
         return
       }
+      // ✅【新增】同步解锁音频：必须紧跟点击手势，不能 await 之后再播
+      window.__alarmAudio = new Audio('alarm.mp3')
+      window.__voiceAudio = new Audio('restore.mp3')
+      ;[window.__alarmAudio, window.__voiceAudio].forEach(a => {
+        a.muted = true
+        a.play().then(() => {
+          a.pause()
+          a.currentTime = 0
+          a.muted = false
+        }).catch(() => {})
+      })
       try {
         const res = await this.instance({
           url: '/user/login',

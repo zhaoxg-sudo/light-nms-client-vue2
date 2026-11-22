@@ -455,6 +455,8 @@ export default {
         if (targetMarker) {
           targetMarker.online = (data.status === 'online')
           targetMarker.devChannelOnline = data.status
+          // 同步更新devicepanel
+          this.devInfo.devChannelOnline = data.status
           // ✏️【MODIFIED】图标只看业务通道状态，和GPS无关
           if (targetMarker.devChannelOnline === 'online') {
             targetMarker.marker.setIcon(targetMarker.greenIcon)
@@ -499,19 +501,6 @@ export default {
       },
       deep: true
     }
-
-    // 'gpschannelonoffline': {
-    //   handler (data) {
-    //     console.log('[screen] store->gpschannelonoffline :=', data)
-    //     if (!data || !data.sn) return
-    //     const targetMarker = this.dbGreenMarkers.find(m => m.sn === data.sn)
-    //     if (targetMarker) {
-    //       targetMarker.gpsChannelOnline = data.status
-    //       console.log('[screen] gpschannelonoffline 在线状态改变，点位cid=', data.sn, data.status)
-    //     }
-    //   },
-    //   deep: true
-    // }
   },
 
   created () {
@@ -874,6 +863,29 @@ export default {
       }
       // e.target.blur()
     },
+    // 大屏全屏按钮点击事件
+    // handleFullScreen () {
+    //   // 区分两种全屏：JSAPI全屏 / F11浏览器原生全屏
+    //   if (document.fullscreenElement) {
+    //     // 这是JS API进入的全屏，可以正常退出
+    //     document.exitFullscreen()
+    //     this.isFullScreen = false
+    //   } else {
+    //     // 重点：这里判断 —— 如果已经是F11全屏（浏览器全屏，但fullscreenElement为空）
+    //     // 无法用JS退出，给提示；否则执行JS全屏
+    //     const isBrowserF11Full = window.innerHeight === screen.height
+    //     if (isBrowserF11Full) {
+    //       this.$message.warning('当前是F11浏览器全屏，请先按F11退出，再使用大屏按钮')
+    //       return
+    //     }
+    //     // 正常进入JS大屏全屏
+    //     document.documentElement.requestFullscreen().then(() => {
+    //       this.isFullScreen = true
+    //     }).catch(err => {
+    //       console.error('全屏失败', err)
+    //     })
+    //   }
+    // },
     toggleDrawMode () {
       this.drawPointMode = !this.drawPointMode
       if (this.drawPointMode) this.showTip('已开启点位配置，点击地图任意位置弹出录入窗口')
@@ -1420,7 +1432,7 @@ export default {
       currPoint.gcjLng = data.gcjLng
       currPoint.gcjLat = data.gcjLat
       currPoint.sn = data.sn
-      console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字不刷新，只改经纬度✅')
+      // console.log('✅ [updateMapPointByID]：地图绿点+表格在线文字不刷新，只改经纬度✅')
     },
 
     locateCenterMarker () {

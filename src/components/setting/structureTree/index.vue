@@ -382,13 +382,51 @@ export default {
     //       </span>)
     //   }
     // },
+    // renderContent (h, { node, data, store }) {
+    //   console.log('enter into tree update status........', data.stationtype)
+    //   console.log('renderContent:', this.stationStatus)
+    //   if (this.stationStatus === 'change') {
+    //     // ==========【标记修改】只有组织节点stationtype=0才显示+-按钮 ==========
+    //     const showOperBtn = data.stationtype === '0'
+    //     // const showOperBtn = true
+    //     let neww = false
+    //     if (node.label === '新建站点') {
+    //       neww = true
+    //     } else {
+    //       neww = true
+    //     }
+    //     return (
+    //       <span class="custom-tree-node">
+    //         <span contenteditable = {neww} onkeydown={(event) => this.enter(event, data, node)} onblur = {() => this.renameDeviceGroupList(event, data, node)}>
+    //           {node.label}
+    //         </span>
+    //         {
+    //           showOperBtn ? (
+    //             <span>
+    //               <el-button size="mini" type="text" on-click={ () => this.addNode(node, data) }><i class = "fa fa-plus"></i></el-button>
+    //               <el-button size="mini" type="text" on-click={ () => this.remove(node, data) }><i class = "fa fa-minus"></i></el-button>
+    //             </span>
+    //           ) : null
+    //         }
+    //       </span>)
+    //   } else {
+    //     return (
+    //       <span class="custom-tree-node">
+    //         <span>{node.label}</span>
+    //       </span>)
+    //   }
+    // },
     renderContent (h, { node, data, store }) {
       console.log('enter into tree update status........', data.stationtype)
       console.log('renderContent:', this.stationStatus)
       if (this.stationStatus === 'change') {
-        // ==========【标记修改】只有组织节点stationtype=0才显示+-按钮 ==========
-        const showOperBtn = data.stationtype === '0'
-        // const showOperBtn = true
+        // ==========【标记修改】
+        // stationtype=0 组织节点：同时显示 +、-
+        // stationtype=1 设备站点：只显示 -，不显示 +
+        const isOrgNode = data.stationtype === '0'
+        const showAddBtn = isOrgNode
+        const showDelBtn = true // 组织、设备站点都可以显示删除按钮
+
         let neww = false
         if (node.label === '新建站点') {
           neww = true
@@ -400,14 +438,18 @@ export default {
             <span contenteditable = {neww} onkeydown={(event) => this.enter(event, data, node)} onblur = {() => this.renameDeviceGroupList(event, data, node)}>
               {node.label}
             </span>
-            {
-              showOperBtn ? (
-                <span>
+            <span>
+              {
+                showAddBtn ? (
                   <el-button size="mini" type="text" on-click={ () => this.addNode(node, data) }><i class = "fa fa-plus"></i></el-button>
+                ) : null
+              }
+              {
+                showDelBtn ? (
                   <el-button size="mini" type="text" on-click={ () => this.remove(node, data) }><i class = "fa fa-minus"></i></el-button>
-                </span>
-              ) : null
-            }
+                ) : null
+              }
+            </span>
           </span>)
       } else {
         return (
