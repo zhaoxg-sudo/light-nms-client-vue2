@@ -269,7 +269,7 @@
         </dv-border-box-1>
       </div>
 
-      <DeviceControlPanel :visible.sync="showDevicePanel" :remoteId="remoteId" :devInfo="devInfo"/>
+      <DeviceControlPanel :visible.sync="showDevicePanel" :remoteId="remoteId" :devInfo="devInfo" :devStatusToPanel="devStatusToPanel"/>
       <MainControlPanel :visible="showMainPanel" @close="showMainPanel = false" />
       <OperLogPanel :visible.sync="operLogVisible" />
       <div class="point-mask" v-if="showPointDialog">
@@ -328,6 +328,7 @@ export default {
       marker: null,
       textLabel: null,
       deviceOnline: false,
+      devStatusToPanel: 'offline',
       remoteId: '',
       devInfo: {},
       lastGps: null,
@@ -375,7 +376,9 @@ export default {
       activeDeviceTab: '直流柜',
       // 两个Tab的搜索框
       deviceSearch1: '',
-      deviceSearch2: ''
+      deviceSearch2: '',
+      // 音频解锁
+      audioUnlocked: false
     }
   },
 
@@ -456,7 +459,7 @@ export default {
           targetMarker.online = (data.status === 'online')
           targetMarker.devChannelOnline = data.status
           // 同步更新devicepanel
-          this.devInfo.devChannelOnline = data.status
+          this.devStatusToPanel = data.status
           // ✏️【MODIFIED】图标只看业务通道状态，和GPS无关
           if (targetMarker.devChannelOnline === 'online') {
             targetMarker.marker.setIcon(targetMarker.greenIcon)
@@ -525,7 +528,12 @@ export default {
     this.initLineChart()
     this.timer = setInterval(() => this.updateTime(), 1000)
     this.initMap()
-    window.__screenResizeHandler = () => this.$nextTick(() => this.getHeightsWidths())
+    // window.__screenResizeHandler = () => this.$nextTick(() => this.getHeightsWidths())
+    window.__screenResizeHandler = () => {
+      this.$nextTick(() => this.getHeightsWidths())
+      // ====== 新增：识别F11原生全屏 ======
+      this.checkBrowserNativeFull()
+    }
     window.addEventListener('resize', window.__screenResizeHandler)
     document.addEventListener('fullscreenchange', this.__fullscreenHandler = () => {
       if (!document.fullscreenElement) {
@@ -534,8 +542,32 @@ export default {
           const fullBtn = document.querySelector('.top-right .btn:nth-child(2)')
           if (fullBtn) fullBtn.blur()
         })
+      } else {
+        this.isFullScreen = true
       }
     })
+    // 音频解锁
+    this.unlockAudioHandler = () => {
+      if (this.audioUnlocked) return
+      // 还没实例化就先创建
+      if (!window.__alarmAudio) {
+        window.__alarmAudio = new Audio('alarm.mp3')
+        window.__voiceAudio = new Audio('restore.mp3')
+      }
+      const list = [window.__alarmAudio, window.__voiceAudio]
+      list.forEach(a => {
+        a.muted = true
+        a.play().then(() => {
+          a.pause()
+          a.currentTime = 0
+          a.muted = false
+        }).catch(() => {})
+      })
+      this.audioUnlocked = true
+      console.log('✅ 点击/按键解锁音频完成')
+    }
+    document.addEventListener('keydown', this.unlockAudioHandler)
+    document.addEventListener('click', this.unlockAudioHandler)
   },
 
   beforeRouteLeave (to, from, next) { next() },
@@ -557,6 +589,9 @@ export default {
     this.__fullscreenHandler = null
     this.instance = null
     if (document.fullscreenElement) document.exitFullscreen()
+
+    document.removeEventListener('keydown', this.unlockAudioHandler)
+    document.removeEventListener('click', this.unlockAudioHandler)
   },
 
   deactivated () {
@@ -589,6 +624,20 @@ export default {
   sockets: {},
 
   methods: {
+    checkBrowserNativeFull () {
+      // 区分：JS API全屏（fullscreenElement存在） 和 F11浏览器原生全屏
+      if (document.fullscreenElement) {
+        // JS全屏，交给fullscreenchange控制，这里不覆盖
+        return
+      }
+      // F11原生全屏判断条件：窗口宽高等于屏幕宽高
+      const isF11Full = (window.innerHeight === screen.height && window.innerWidth === screen.width)
+      // 只有状态不一样才赋值，防止无限循环
+      if (this.isFullScreen !== isF11Full) {
+        this.isFullScreen = isF11Full
+      }
+    },
+
     openOperLog () {
       this.operLogVisible = true
     },
@@ -818,24 +867,45 @@ export default {
 
     openDevicePanel (id) {
       const deviceItem = this.dbGreenMarkers.find(item => item.id === id)
-      if (deviceItem && deviceItem.devChannelOnline === 'online') {
-        this.remoteId = id
-        this.devInfo.id = deviceItem.id
-        this.devInfo.name = deviceItem.name
-        this.devInfo.sn = deviceItem.sn
-        this.devInfo.online = deviceItem.online
-        this.devInfo.devChannelOnline = deviceItem.devChannelOnline
-        this.devInfo.gpsChannelOnline = deviceItem.gpsChannelOnline
-        this.devInfo.gcjLat = deviceItem.gcjLat
-        this.devInfo.gcjLng = deviceItem.gcjLng
-        this.devInfo.devType = '直流柜'
-        console.log('openDevicePanel传入的', this.devInfo)
-        this.showDevicePanel = true
-      } else {
-        this.showTip('该设备当前离线，无法打开设备控制面板！')
+      // if (deviceItem && deviceItem.devChannelOnline === 'online') {
+      this.remoteId = id
+      this.devInfo.id = deviceItem.id
+      this.devInfo.name = deviceItem.name
+      this.devInfo.sn = deviceItem.sn
+      this.devInfo.online = deviceItem.online
+      this.devInfo.devChannelOnline = deviceItem.devChannelOnline
+      this.devInfo.gpsChannelOnline = deviceItem.gpsChannelOnline
+      this.devInfo.gcjLat = deviceItem.gcjLat
+      this.devInfo.gcjLng = deviceItem.gcjLng
+      this.devInfo.devType = '直流柜'
+      // 同步设备在线状态,如果为’‘，则置’offline‘
+      this.devStatusToPanel = deviceItem.devChannelOnline
+      if (this.devStatusToPanel === '') this.devStatusToPanel = 'offline'
+      console.log('openDevicePanel传入的', this.devInfo)
+      this.showDevicePanel = true
+      // } else {
+      //   this.showTip('该设备当前离线，无法打开设备控制面板！')
+      // }
+    },
+    async toggleFullScreen () {
+      // 先判断：当前是F11原生全屏
+      const isF11Full = (Math.abs(window.innerHeight - screen.height) <= 2 && Math.abs(window.innerWidth - screen.width) <= 2 && !document.fullscreenElement)
+      if (isF11Full) {
+        this.$message.warning('当前是浏览器F11原生全屏，请按F11退出！')
+        return
+      }
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen()
+          this.isFullScreen = true
+        } else {
+          await document.exitFullscreen()
+          this.isFullScreen = false
+        }
+      } catch (err) {
+        console.error('全屏失败：', err)
       }
     },
-
     // toggleFullScreen (e) {
     //   const targetDom = document.querySelector('.screen-page')
     //   if (!this.isFullScreen) {
@@ -847,22 +917,22 @@ export default {
     //   }
     //   e.target.blur()
     // },
-    async toggleFullScreen () {
-      try {
-        if (!document.fullscreenElement) {
-          // 进入全屏（和F11效果一致）
-          await document.documentElement.requestFullscreen()
-          this.isFullScreen = true
-        } else {
-          // 退出全屏
-          await document.exitFullscreen()
-          this.isFullScreen = false
-        }
-      } catch (err) {
-        console.error('全屏失败：', err)
-      }
-      // e.target.blur()
-    },
+    // async toggleFullScreen () {
+    //   try {
+    //     if (!document.fullscreenElement) {
+    //       // 进入全屏（和F11效果一致）
+    //       await document.documentElement.requestFullscreen()
+    //       this.isFullScreen = true
+    //     } else {
+    //       // 退出全屏
+    //       await document.exitFullscreen()
+    //       this.isFullScreen = false
+    //     }
+    //   } catch (err) {
+    //     console.error('全屏失败：', err)
+    //   }
+    //   // e.target.blur()
+    // },
     // 大屏全屏按钮点击事件
     // handleFullScreen () {
     //   // 区分两种全屏：JSAPI全屏 / F11浏览器原生全屏

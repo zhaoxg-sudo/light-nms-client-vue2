@@ -34,8 +34,8 @@
         </div>
         <div class="info-item">
           <span class="info-label">状态：</span>
-          <span class="status-dot" :class="devInfo.devChannelOnline"></span>
-          <span class="info-value">{{ getStatusText(devInfo.devChannelOnline) }}</span>
+          <span class="status-dot" :class="this.devStatusToPanel"></span>
+          <span class="info-value">{{ getStatusText(this.devStatusToPanel) }}</span>
         </div>
       </div>
       <!-- 快捷操作按钮区 -->
@@ -163,6 +163,10 @@ export default {
       type: String,
       default: ''
     },
+    devStatusToPanel: {
+      type: String,
+      default: 'offline'
+    },
     devInfo: {
       type: Object,
       default: function () {
@@ -187,6 +191,13 @@ export default {
   },
   mounted () {
     console.log('devicepanel 接收父节点数据devInfo：', this.devInfo)
+  },
+  watch: {
+    devStatusToPanel (newVal) {
+      // 同步更新面板内状态
+      console.log('✅devStatusToPanel面板收到状态变化', newVal)
+      // this.devInfo.devChannelOnline = newVal
+    }
   },
   methods: {
     // ========== 自动模式回调 ==========
