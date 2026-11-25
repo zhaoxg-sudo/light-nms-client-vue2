@@ -49,7 +49,6 @@
                   v-model="item.time"
                   format="HH:mm:ss"
                   value-format="HH:mm:ss"
-                  size="mini"
                   popper-append-to-body="false"
                 ></el-time-picker>
                 <div class="operate">
@@ -89,7 +88,6 @@
                   v-model="item.time"
                   format="HH:mm:ss"
                   value-format="HH:mm:ss"
-                  size="mini"
                   popper-append-to-body="false"
                 ></el-time-picker>
                 <div class="operate">
@@ -129,7 +127,6 @@
                   v-model="item.time"
                   format="HH:mm:ss"
                   value-format="HH:mm:ss"
-                  size="mini"
                   popper-append-to-body="false"
                 ></el-time-picker>
                 <div class="operate">
@@ -204,7 +201,6 @@
             v-model="tempTime"
             format="HH:mm:ss"
             value-format="HH:mm:ss"
-            size="mini"
             popper-append-to-body="false"
           ></el-time-picker>
         </div>
@@ -591,4 +587,17 @@ export default {
 .dark-auto-dialog {
   z-index: 20001 !important;
 }
+/*加大x下拉时间窗口字体*/
+.time-picker-lg /deep/ .el-input__inner {
+  height: 36px;
+  font-size: 15px;
+  line-height: 36px;
+}
+.time-picker-lg /deep/ .el-input__icon {
+  line-height: 36px;
+}
+.time-picker-lg /deep/ .el-time-spinner__list {
+  font-size: 15px;
+}
+
 </style>

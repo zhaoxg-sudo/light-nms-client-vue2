@@ -99,6 +99,7 @@ export default {
           a.muted = false
         }).catch(() => {})
       })
+      console.log('✅ login解锁音频完成')
       try {
         const res = await this.instance({
           url: '/user/login',

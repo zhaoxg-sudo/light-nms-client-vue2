@@ -91,7 +91,6 @@
                       </span>
                    <span style="white-space: nowrap; margin-left:8px;">
   <el-button
-    v-if="dev.devChannelOnline === 'online'"
     size="mini"
     type="primary"
     class="quick-panel-btn"
