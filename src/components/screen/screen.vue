@@ -528,23 +528,50 @@ export default {
     this.timer = setInterval(() => this.updateTime(), 1000)
     this.initMap()
     // window.__screenResizeHandler = () => this.$nextTick(() => this.getHeightsWidths())
+    // 20261125 del
+    // window.__screenResizeHandler = () => {
+    //   this.$nextTick(() => this.getHeightsWidths())
+    //   // ====== 新增：识别F11原生全屏 ======
+    //   this.checkBrowserNativeFull()
+    // }
+    // window.addEventListener('resize', window.__screenResizeHandler)
+    // document.addEventListener('fullscreenchange', this.__fullscreenHandler = () => {
+    //   if (!document.fullscreenElement) {
+    //     this.isFullScreen = false
+    //     this.$nextTick(() => {
+    //       const fullBtn = document.querySelector('.top-right .btn:nth-child(2)')
+    //       if (fullBtn) fullBtn.blur()
+    //     })
+    //   } else {
+    //     this.isFullScreen = true
+    //   }
+    // })
+    // 20261125 del end
+    // 【MODIFIED】resize 回调：统一调用 syncFullState，不再用旧宽高判断
     window.__screenResizeHandler = () => {
       this.$nextTick(() => this.getHeightsWidths())
-      // ====== 新增：识别F11原生全屏 ======
-      this.checkBrowserNativeFull()
+      this.syncFullState()
     }
     window.addEventListener('resize', window.__screenResizeHandler)
+
+    // 【MODIFIED】fullscreenchange：只负责 JS 原生 API 全屏，先统一同步状态
     document.addEventListener('fullscreenchange', this.__fullscreenHandler = () => {
+      this.syncFullState()
       if (!document.fullscreenElement) {
-        this.isFullScreen = false
         this.$nextTick(() => {
           const fullBtn = document.querySelector('.top-right .btn:nth-child(2)')
           if (fullBtn) fullBtn.blur()
         })
-      } else {
-        this.isFullScreen = true
       }
     })
+
+    // 【MODIFIED-新增】F11 按键兜底同步（主识别仍走 resize 里的 syncFullState）
+    this.__f11KeyHandler = (e) => {
+      if (e.key === 'F11') {
+        this.$nextTick(() => this.syncFullState())
+      }
+    }
+    document.addEventListener('keydown', this.__f11KeyHandler)
     // 音频解锁
     this.unlockAudioHandler = () => {
       if (this.audioUnlocked) return
@@ -587,6 +614,11 @@ export default {
     document.removeEventListener('fullscreenchange', this.__fullscreenHandler)
     this.__fullscreenHandler = null
     this.instance = null
+
+    // 【MODIFIED-新增】移除 F11 兜底监听
+    document.removeEventListener('keydown', this.__f11KeyHandler)
+    this.__f11KeyHandler = null
+    document.body.classList.remove('is-screen-full')
     if (document.fullscreenElement) document.exitFullscreen()
 
     document.removeEventListener('keydown', this.unlockAudioHandler)
@@ -886,25 +918,46 @@ export default {
       //   this.showTip('该设备当前离线，无法打开设备控制面板！')
       // }
     },
+    // ==========【MODIFIED】统一同步 isFullScreen：JS API 全屏 + F11 原生全屏 ==========
+    syncFullState () {
+      const full = !!document.fullscreenElement
+      this.isFullScreen = full
+      document.body.classList.toggle('is-screen-full', full)
+    },
+
+    // ==========【MODIFIED】大屏按钮：不再拦截 F11 提示，统一走 JS 标准全屏 API ==========
     async toggleFullScreen () {
-      // 先判断：当前是F11原生全屏
-      const isF11Full = (Math.abs(window.innerHeight - screen.height) <= 2 && Math.abs(window.innerWidth - screen.width) <= 2 && !document.fullscreenElement)
-      if (isF11Full) {
-        this.$message.warning('当前是浏览器F11原生全屏，请按F11退出！')
-        return
-      }
       try {
         if (!document.fullscreenElement) {
           await document.documentElement.requestFullscreen()
-          this.isFullScreen = true
         } else {
           await document.exitFullscreen()
-          this.isFullScreen = false
         }
       } catch (err) {
         console.error('全屏失败：', err)
       }
     },
+    // 20261125 del
+    // async toggleFullScreen () {
+    //   // 先判断：当前是F11原生全屏
+    //   const isF11Full = (Math.abs(window.innerHeight - screen.height) <= 2 && Math.abs(window.innerWidth - screen.width) <= 2 && !document.fullscreenElement)
+    //   if (isF11Full) {
+    //     this.$message.warning('当前是浏览器F11原生全屏，请按F11退出！')
+    //     return
+    //   }
+    //   try {
+    //     if (!document.fullscreenElement) {
+    //       await document.documentElement.requestFullscreen()
+    //       this.isFullScreen = true
+    //     } else {
+    //       await document.exitFullscreen()
+    //       this.isFullScreen = false
+    //     }
+    //   } catch (err) {
+    //     console.error('全屏失败：', err)
+    //   }
+    // },
+    // 20261125 del end
     // toggleFullScreen (e) {
     //   const targetDom = document.querySelector('.screen-page')
     //   if (!this.isFullScreen) {
@@ -1950,7 +2003,7 @@ export default {
   font-weight: bold;
 }
 /*device-table end*/
-/* .screen-full {
+.screen-full {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -1963,7 +2016,13 @@ export default {
 .screen-full .content-screen {
   height: calc(100% - 60px) !important;
   padding-bottom: 15px !important;
-} */
+}
+/* 大屏模式隐藏外层底部 bottomTools */
+/deep/ body:has(.screen-full) .bottomTools {
+  display: none !important;
+}
+/* screen full */
+/*screen full end */
 
 .map-tool-bar {
   position: absolute;
@@ -2291,5 +2350,10 @@ export default {
 /* 恢复 overlay 内所有元素的点击交互 */
 .map-ui-overlay > * {
   pointer-events: auto;
+}
+</style>
+<style>
+body.is-screen-full .bottomTools {
+  display: none !important;
 }
 </style>

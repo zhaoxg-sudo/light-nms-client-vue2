@@ -5,6 +5,8 @@
     width="1200px"
     @close="handleClose"
     custom-class="dark-panel-dialog"
+    append-to-body
+    :modal-append-to-body="false"
   >
     <!-- 自定义标题插槽，内联样式强制放大 -->
     <template slot="title">
