@@ -7,6 +7,7 @@
     custom-class="dark-panel-dialog"
     append-to-body
     :modal-append-to-body="false"
+    :close-on-click-modal="false"
   >
     <!-- 自定义标题插槽 -->
     <template slot="title">
@@ -139,24 +140,61 @@
             {{ item.status ? '通' : '断' }}
           </span>
 
-          <p class="loop-name">名称: 回路{{ item.id }}</p>
-          <p class="loop-tip">控制: 通路/断路</p>
+          <p class="loop-name">回路{{ item.id }}</p>
+          <p class="loop-tip">鼠标切换通路/断路</p>
         </div>
       </div>
 
       <!-- 调光回路 -->
+      <!-- <div class="dimmer-loop-row">
+        <div class="dimmer-item" v-for="item in dimmerLoops" :key="item.id">
+          <div class="dimmer-header">
+            <span>调光回路{{ item.id }}</span>
+            <el-button size="mini" type="primary" @click="sendDimmerCmd(item)">调光</el-button>
+          </div>
+          <div
+             @mousedown.native.stop
+             @pointerdown.native.stop
+             @touchstart.native.stop
+             @mouseup.native.stop>
+            <el-slider
+              v-model="item.brightness"
+              :min="0"
+              :max="100"
+            ></el-slider>
+          </div>
+          <p class="brightness-val">亮度: {{ item.brightness }}</p>
+        </div>
+      </div> -->
+      <!-- 调光回路 -->
       <div class="dimmer-loop-row">
         <div class="dimmer-item" v-for="item in dimmerLoops" :key="item.id">
           <div class="dimmer-header">
-            <span>名称: 调光回路{{ item.id }}</span>
+            <span>调光回路{{ item.id }}</span>
             <el-button size="mini" type="primary" @click="sendDimmerCmd(item)">调光</el-button>
           </div>
-          <el-slider
-            v-model="item.brightness"
-            :min="0"
-            :max="100"
-            @change="sendDimmerCmd(item)"
-          ></el-slider>
+          <div
+            class="slider-wrap"
+            @mousedown.native.stop
+            @pointerdown.native.stop
+            @touchstart.native.stop
+            @mouseup.native.stop
+          >
+            <el-slider
+              v-model="item.brightness"
+              :min="0"
+              :max="100"
+              class="d-slider"
+            ></el-slider>
+            <el-input-number
+              v-model="item.brightness"
+              :min="0"
+              :max="100"
+              :step="1"
+              size="mini"
+              class="dimmer-num-input"
+            ></el-input-number>
+          </div>
           <p class="brightness-val">亮度: {{ item.brightness }}</p>
         </div>
       </div>
@@ -646,6 +684,19 @@ export default {
 .offline-text {
   color: #f56c6c;
 }
+/* 调光滑块*/
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.d-slider {
+  flex: 1;
+}
+.dimmer-num-input {
+  width: 90px;
+}
+
 </style>
 
 <style>
@@ -657,4 +708,38 @@ export default {
 .dark-panel-dialog .el-dialog__body {
   padding: 12px 16px;
 }
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__decrease,
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__increase {
+  background-color: #0f2238 !important;
+  border-color: #2c5b88 !important;
+  color: #00e5ff !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-weight: bold !important;
+  font-size: 14px !important;
+}
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__decrease:hover,
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__increase:hover {
+  background-color: #153455 !important;
+  border-color: #00e5ff !important;
+  color: #ffffff !important;
+}
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__decrease:active,
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__increase:active {
+  background-color: #005b70 !important;
+}
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__decrease.is-disabled,
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input-number__increase.is-disabled {
+  background-color: #182533 !important;
+  border-color: #243b50 !important;
+  color: #446078 !important;
+  cursor: not-allowed !important;
+}
+.dark-panel-dialog .el-input-number.dimmer-num-input .el-input__inner {
+  background: #14203a !important;
+  border-color: #2c5b88 !important;
+  color: #fff !important;
+  text-align: center !important;
+}
+
 </style>
