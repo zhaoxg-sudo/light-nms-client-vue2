@@ -8,6 +8,8 @@
     :close-on-click-modal="false"
     @close="handleClose"
     custom-class="dark-dialog"
+    append-to-body="false"
+    modal-append-to-body="false"
   >
   <!-- ✅ 新增标题插槽，文字居中，对齐devicepanel样式 -->
   <template slot="title">
