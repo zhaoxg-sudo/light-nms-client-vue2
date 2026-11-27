@@ -99,7 +99,7 @@
       </div>
 
       <!-- 直流回路区 -->
-      <div class="dc-loop-card">
+      <!-- <div class="dc-loop-card">
         <div class="dc-label">直流回路</div>
         <div class="dc-content">
           <p class="dc-item">回路: {{ currentDcIndex + 1 }}</p>
@@ -124,6 +124,64 @@
               @click="nextDcLoop">
             </el-button>
           </div>
+        </div>
+      </div> -->
+      <!-- 直流回路区 -->
+      <div class="dc-loop-card">
+        <div class="dc-label">直流回路</div>
+        <div class="dc-content">
+          <el-button
+            size="mini"
+            type="primary"
+            class="dc-toggle-btn"
+            @click="toggleDcAll">
+            {{ showAllDc ? '返回单路' : '查看全部6路' }}
+          </el-button>
+
+          <div v-if="showAllDc" class="dc-all-cards">
+            <div
+              v-for="(item, idx) in dcLoopList"
+              :key="idx"
+              class="dc-all-card">
+              <div class="dc-card-title">回路{{ idx + 1 }}</div>
+              <div class="dc-card-row">
+                <span class="dc-card-label">电压</span>
+                <span class="dc-card-value">{{ item.voltage }} V</span>
+              </div>
+              <div class="dc-card-row">
+                <span class="dc-card-label">电流</span>
+                <span class="dc-card-value">{{ item.current }} A</span>
+              </div>
+              <div class="dc-card-row">
+                <span class="dc-card-label">功率</span>
+                <span class="dc-card-value">{{ item.power }} kW</span>
+              </div>
+            </div>
+          </div>
+
+          <template v-else>
+            <p class="dc-item">回路: {{ currentDcIndex + 1 }}</p>
+            <p class="dc-item">直流电压: {{ dcLoopList[currentDcIndex].voltage }}V</p>
+            <p class="dc-item">直流电流: {{ dcLoopList[currentDcIndex].current }}A</p>
+            <p class="dc-item">直流功率: {{ dcLoopList[currentDcIndex].power }}kW</p>
+
+            <div class="dc-arrow-group">
+              <el-button
+                icon="el-icon-arrow-left"
+                circle
+                size="mini"
+                class="dc-arrow-btn"
+                @click="prevDcLoop">
+              </el-button>
+              <el-button
+                icon="el-icon-arrow-right"
+                circle
+                size="mini"
+                class="dc-arrow-btn"
+                @click="nextDcLoop">
+              </el-button>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -239,6 +297,7 @@ export default {
   },
   data () {
     return {
+      showAllDc: false,
       currentDcIndex: 0,
       dcLoopList: [
         { voltage: '0.00', current: '0.00', power: '0.00' },
@@ -270,6 +329,10 @@ export default {
     }
   },
   methods: {
+    toggleDcAll () {
+      this.showAllDc = !this.showAllDc
+    },
+
     handleRunMode (mode, sn) {
       console.log('执行当前模式', mode, sn)
     },
@@ -696,7 +759,40 @@ export default {
 .dimmer-num-input {
   width: 90px;
 }
+.dc-all-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  flex: 1;
+}
+.dc-all-card {
+  background: #14203a;
+  border: 1px solid rgba(0,229,255,0.25);
+  border-radius: 6px;
+  padding: 10px;
+}
+.dc-card-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00e5ff;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(0,229,255,0.3);
+}
+.dc-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+}
+.dc-card-label {
+  color: #73b8ff;
+}
+.dc-card-value {
+  color: #fff;
+}
 
+/* 直流回路切换按钮：深色科技风 */
 </style>
 
 <style>
@@ -740,6 +836,24 @@ export default {
   border-color: #2c5b88 !important;
   color: #fff !important;
   text-align: center !important;
+}
+/* 直流回路切换按钮：与“调光”按钮保持一致 */
+.el-button.dc-toggle-btn {
+  background-color: #409eff !important;
+  border-color: #409eff !important;
+  color: #ffffff !important;
+  font-weight: bold !important;
+}
+
+.el-button.dc-toggle-btn:hover {
+  background-color: #66b1ff !important;
+  border-color: #66b1ff !important;
+  color: #ffffff !important;
+}
+
+.el-button.dc-toggle-btn:active {
+  background-color: #3a8ee6 !important;
+  border-color: #3a8ee6 !important;
 }
 
 </style>
